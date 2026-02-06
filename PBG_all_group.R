@@ -27,7 +27,7 @@ biomass_diskpasture<-read_csv("Data_PBG_species/PBG031.csv")
 biomass_reg <- biomass_diskpasture%>%
   #creating row number in order to visualise outliers in the graph
   mutate(row_num= 1:length(Lvgrass))%>%
-  #the 2011 data were not previously converted to the appropriate scale
+  #converting to the appropriate scale g/m2
   mutate(Lvgrass_clean = Lvgrass*10,
          Pdead_clean= Pdead*10,
          Forbs_clean = Forbs*10,
