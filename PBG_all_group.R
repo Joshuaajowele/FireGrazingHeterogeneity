@@ -183,9 +183,9 @@ YrSinceFire_key <- tibble(year_watershed= c("2013_C03A",
 biomass_ready<-biomass_data%>%
   left_join(watershed_key, by="Watershed")%>%
   left_join(YrSinceFire_key, by="year_watershed")%>%
-  group_by(Recyear, Unit, Watershed, FireGrzTrt, time_fire, Transect, Plotnum)%>%
+  group_by(Recyear, Unit, Watershed, FireGrzTrt, Transect, Plotnum)%>%
   summarise(biomass=mean(biomass, na.rm=T))%>%
-  group_by(Recyear, Unit, Watershed, FireGrzTrt, time_fire, Transect)%>%
+  group_by(Recyear, Unit, Watershed, FireGrzTrt,Transect)%>%
   summarise(biomass=mean(biomass, na.rm=T))
   
 ##Temporal analysis at the local/transect scale####
@@ -203,8 +203,89 @@ temp_biomdata$FireGrzTrt=as.factor(temp_biomdata$FireGrzTrt)
 #start analysis
 temp_mean_m<-lmer(temp_biom~FireGrzTrt+(1|Unit/Watershed), data=temp_biomdata)
 anova(temp_mean_m)
-temp_sd_m<-lmer(temp_biom_sd~FireGrzTrt+(1|Unit), data=temp_biomdata)
+temp_sd_m<-lmer(log(temp_biom_sd)~FireGrzTrt+(1|Unit), data=temp_biomdata[temp_biomdata$temp_biom_sd<1000,])
 anova(temp_sd_m)
-temp_cv_m<-lmer(temp_biom_cv~FireGrzTrt+(1|Unit), data=temp_biomdata)
+check_model(temp_sd_m)
+summary(temp_sd_m)
+temp_cv_m<-lmer(temp_biom_cv~FireGrzTrt+(1|Unit), data=temp_biomdata[temp_biomdata$temp_biom_cv<1,])
 anova(temp_cv_m)
 
+ggplot(temp_biomdata,aes(FireGrzTrt, temp_biom_cv))+
+  geom_boxplot()
+##Spatial variability at pasture scale####
+#wrangle data
+spat_biomdata<-biomass_ready%>%
+  group_by(Recyear,Unit,FireGrzTrt)%>%
+  summarise(spat_biom=mean(biomass, na.rm=T),
+            spat_biom_sd=sd(biomass),
+            spat_biom_cv=spat_biom_sd/spat_biom)
+#convert charcter to factors
+spat_biomdata$Unit=as.factor(spat_biomdata$Unit)
+spat_biomdata$FireGrzTrt=as.factor(spat_biomdata$FireGrzTrt)
+spat_biomdata$Recyear=as.factor(spat_biomdata$Recyear)
+#analysis
+spat_biommean_m<-lmer(log(spat_biom)~FireGrzTrt*Recyear+(1|Unit), data=spat_biomdata)
+anova(spat_biommean_m)#marginal
+summary(spat_biommean_m)
+check_model(spat_biommean_m)
+
+spat_biomsd_m<-lmer(log(spat_biom_sd)~FireGrzTrt*Recyear+(1|Unit), data=spat_biomdata)
+anova(spat_biomsd_m)
+check_model(spat_biomsd_m)
+
+spat_biomcv_m<-lmer(log(spat_biom_cv)~FireGrzTrt*Recyear+(1|Unit), data=spat_biomdata)
+anova(spat_biomcv_m)
+check_model(spat_biomcv_m)
+
+##visuals####
+testInteractions(spat_biommean_m, pairwise="FireGrzTrt")
+biom_mean<-interactionMeans(spat_biommean_m)%>%
+  mutate(biomass=exp(`adjusted mean`),
+         biomass_up=exp(`adjusted mean`+`SE of link`),
+         biomass_low=exp(`adjusted mean`-`SE of link`))
+
+biom_mean_fig<-ggplot(biom_mean,aes(Recyear, biomass,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(Recyear)))+
+  geom_errorbar(aes(ymin=biomass_low,
+                    ymax=biomass_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Plant Biomass (gm"^-2*")"))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#sd
+biom_sd<-interactionMeans(spat_biomsd_m)%>%
+  mutate(biomass=exp(`adjusted mean`),
+         biomass_up=exp(`adjusted mean`+`SE of link`),
+         biomass_low=exp(`adjusted mean`-`SE of link`))
+
+biom_sd_fig<-ggplot(biom_sd,aes(Recyear, biomass,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(Recyear)))+
+  geom_errorbar(aes(ymin=biomass_low,
+                    ymax=biomass_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Plant Biomass SD (gm"^-2*")"))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#cv
+biom_cv<-interactionMeans(spat_biomcv_m)%>%
+  mutate(biomass=exp(`adjusted mean`),
+         biomass_up=exp(`adjusted mean`+`SE of link`),
+         biomass_low=exp(`adjusted mean`-`SE of link`))
+
+biom_cv_fig<-ggplot(biom_cv,aes(Recyear, biomass,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(Recyear)))+
+  geom_errorbar(aes(ymin=biomass_low,
+                    ymax=biomass_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Plant Biomass CV")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
