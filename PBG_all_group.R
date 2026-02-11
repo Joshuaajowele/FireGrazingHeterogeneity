@@ -113,6 +113,8 @@ coeff_2023<-as.data.frame(summ_2023$coefficients)%>%
 coeff_combo<-coeff_2013%>%
   bind_rows(coeff_2014,coeff_2015, coeff_2016, coeff_2017, coeff_2018, 
             coeff_2019, coeff_2020, coeff_2021, coeff_2022, coeff_2023)
+#export as csv file
+write.csv(coeff_combo, "biomass_diskht_reg.csv")
 ##estimate biomass from regression equations####
 biomass_data<-Diskht_data%>%
   mutate(biomass=case_when(Recyear==2013~23.98823740*Diskht+36.97926816,
@@ -202,16 +204,85 @@ temp_biomdata$Transect=as.factor(temp_biomdata$Transect)
 temp_biomdata$FireGrzTrt=as.factor(temp_biomdata$FireGrzTrt)
 #start analysis
 temp_mean_m<-lmer(temp_biom~FireGrzTrt+(1|Unit/Watershed), data=temp_biomdata)
+check_model(temp_mean_m)#outlier
+#a good way to visually check outliers from raw values
+ggplot(temp_biomdata[temp_biomdata$temp_biom<1000,],aes(FireGrzTrt, temp_biom))+
+  geom_boxplot()
+#remove outlier and refit model with log transformation to improve model 
+temp_mean_m<-lmer(log(temp_biom)~FireGrzTrt+(1|Unit/Watershed), data=temp_biomdata[temp_biomdata$temp_biom<1000,])
 anova(temp_mean_m)
+check_model(temp_mean_m)
 temp_sd_m<-lmer(log(temp_biom_sd)~FireGrzTrt+(1|Unit), data=temp_biomdata[temp_biomdata$temp_biom_sd<1000,])
 anova(temp_sd_m)
 check_model(temp_sd_m)
-summary(temp_sd_m)
-temp_cv_m<-lmer(temp_biom_cv~FireGrzTrt+(1|Unit), data=temp_biomdata[temp_biomdata$temp_biom_cv<1,])
+temp_cv_m<-lmer(log(temp_biom_cv)~FireGrzTrt+(1|Unit), data=temp_biomdata[temp_biomdata$temp_biom_cv<1,])
+check_model(temp_cv_m)
 anova(temp_cv_m)
 
-ggplot(temp_biomdata,aes(FireGrzTrt, temp_biom_cv))+
-  geom_boxplot()
+###visuals####
+TBM<-interactionMeans(temp_mean_m)%>%
+  mutate(resp="biomass_mean")
+TBSD<-interactionMeans(temp_sd_m)%>%
+  mutate(resp="biomass_sd")
+TBCV<-interactionMeans(temp_cv_m)%>%
+  mutate(resp="biomass_cv")
+temp_biom_vizdata<-TBM%>%
+  bind_rows(TBSD,TBCV)%>%
+  mutate(avg=exp(`adjusted mean`),
+         up=exp(`adjusted mean`+`SE of link`),
+         low=exp(`adjusted mean`-`SE of link`))
+
+TBM_viz<-ggplot(temp_biom_vizdata[temp_biom_vizdata$resp=="biomass_mean",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Plant Biomass (gm"^-2*")"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+TBSD_viz<-ggplot(temp_biom_vizdata[temp_biom_vizdata$resp=="biomass_sd",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Plant Biomass SD (gm"^-2*")"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+TBCV_viz<-ggplot(temp_biom_vizdata[temp_biom_vizdata$resp=="biomass_cv",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Plant Biomass CV")+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#Figure to showw each transect across years
+ggplot(biomass_ready[biomass_ready$biomass<1200,],aes(Recyear, biomass,col=FireGrzTrt, fill=Watershed, shape=Transect))+
+  geom_point(size=5)+
+  geom_path()+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Plant Biomass (gm"^-2*")"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )+
+  facet_wrap(~Unit)
+###combine figures####
+TBM_viz+TBSD_viz+TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
+
+
+
 ##Spatial variability at pasture scale####
 #wrangle data
 spat_biomdata<-biomass_ready%>%
