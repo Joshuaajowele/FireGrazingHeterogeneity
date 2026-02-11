@@ -278,7 +278,11 @@ ggplot(biomass_ready[biomass_ready$biomass<1200,],aes(Recyear, biomass,col=FireG
   )+
   facet_wrap(~Unit)
 ###combine figures####
+<<<<<<< HEAD
 TBM_viz+TBSD_viz+TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+=======
+TBM_viz+TBSD_viz+TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "top")
+>>>>>>> 689d28968c0698e206ba98084ad9da76044cf9c0
 
 
 
