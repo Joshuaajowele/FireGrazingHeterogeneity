@@ -295,25 +295,30 @@ spat_biomdata$Unit=as.factor(spat_biomdata$Unit)
 spat_biomdata$FireGrzTrt=as.factor(spat_biomdata$FireGrzTrt)
 spat_biomdata$Recyear=as.factor(spat_biomdata$Recyear)
 #analysis
-spat_biommean_m<-lmer(log(spat_biom)~FireGrzTrt*Recyear+(1|Unit), data=spat_biomdata)
-anova(spat_biommean_m)#marginal
-summary(spat_biommean_m)
+spat_biommean_m<-lmer(spat_biom~FireGrzTrt*Recyear+(1|Unit), data=spat_biomdata)#remove outliers and refit
+check_outliers(spat_biommean_m)
+spat_biommean_m<-lmer(log(spat_biom)~FireGrzTrt*Recyear+(1|Unit), data=spat_biomdata[spat_biomdata$spat_biom<1000,])
 check_model(spat_biommean_m)
+anova(spat_biommean_m)
+#check interaction
+testInteractions(spat_biommean_m, pairwise="FireGrzTrt",fixed="Recyear")
 
-spat_biomsd_m<-lmer(log(spat_biom_sd)~FireGrzTrt*Recyear+(1|Unit), data=spat_biomdata)
-anova(spat_biomsd_m)
+
+spat_biomsd_m<-lmer(log(spat_biom_sd)~FireGrzTrt*Recyear+(1|Unit), data=spat_biomdata[spat_biomdata$spat_biom_sd<1000,])
 check_model(spat_biomsd_m)
+anova(spat_biomsd_m)
 
-spat_biomcv_m<-lmer(log(spat_biom_cv)~FireGrzTrt*Recyear+(1|Unit), data=spat_biomdata)
-anova(spat_biomcv_m)
+spat_biomcv_m<-lmer(log(spat_biom_cv)~FireGrzTrt*Recyear+(1|Unit), data=spat_biomdata[spat_biomdata$spat_biom_cv<1,])
 check_model(spat_biomcv_m)
+anova(spat_biomcv_m)
+
 
 ##visuals####
-testInteractions(spat_biommean_m, pairwise="FireGrzTrt")
 biom_mean<-interactionMeans(spat_biommean_m)%>%
   mutate(biomass=exp(`adjusted mean`),
          biomass_up=exp(`adjusted mean`+`SE of link`),
-         biomass_low=exp(`adjusted mean`-`SE of link`))
+         biomass_low=exp(`adjusted mean`-`SE of link`),
+         variab="AVG")
 
 biom_mean_fig<-ggplot(biom_mean,aes(Recyear, biomass,col=FireGrzTrt))+
   geom_point(size=5)+
@@ -322,6 +327,7 @@ biom_mean_fig<-ggplot(biom_mean,aes(Recyear, biomass,col=FireGrzTrt))+
                     ymax=biomass_up),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Plant Biomass (gm"^-2*")"))+
+  xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -330,7 +336,8 @@ biom_mean_fig<-ggplot(biom_mean,aes(Recyear, biomass,col=FireGrzTrt))+
 biom_sd<-interactionMeans(spat_biomsd_m)%>%
   mutate(biomass=exp(`adjusted mean`),
          biomass_up=exp(`adjusted mean`+`SE of link`),
-         biomass_low=exp(`adjusted mean`-`SE of link`))
+         biomass_low=exp(`adjusted mean`-`SE of link`),
+         variab="SD")
 
 biom_sd_fig<-ggplot(biom_sd,aes(Recyear, biomass,col=FireGrzTrt))+
   geom_point(size=5)+
@@ -339,6 +346,7 @@ biom_sd_fig<-ggplot(biom_sd,aes(Recyear, biomass,col=FireGrzTrt))+
                     ymax=biomass_up),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Plant Biomass SD (gm"^-2*")"))+
+  xlab(label="Year")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -347,7 +355,8 @@ biom_sd_fig<-ggplot(biom_sd,aes(Recyear, biomass,col=FireGrzTrt))+
 biom_cv<-interactionMeans(spat_biomcv_m)%>%
   mutate(biomass=exp(`adjusted mean`),
          biomass_up=exp(`adjusted mean`+`SE of link`),
-         biomass_low=exp(`adjusted mean`-`SE of link`))
+         biomass_low=exp(`adjusted mean`-`SE of link`),
+         variab="CV")
 
 biom_cv_fig<-ggplot(biom_cv,aes(Recyear, biomass,col=FireGrzTrt))+
   geom_point(size=5)+
@@ -356,7 +365,52 @@ biom_cv_fig<-ggplot(biom_cv,aes(Recyear, biomass,col=FireGrzTrt))+
                     ymax=biomass_up),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Plant Biomass CV")+
+  xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
+###combine figures####
+biom_mean_fig+biom_sd_fig+biom_cv_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+###average figures####
+#wrangle data
+combo_spat_biom<-biom_mean%>%
+  bind_rows(biom_sd,biom_cv)%>%
+  group_by(FireGrzTrt, variab)%>%
+  summarise(biom_avg=mean(biomass, na.rm=T),
+            biom_se=SE_function(biomass))
+#visual
+avg_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="AVG",],aes(FireGrzTrt, biom_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=biom_avg-biom_se,
+                    ymax=biom_avg+biom_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Plant Biomass (gm"^-2*")"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+sd_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="SD",],aes(FireGrzTrt, biom_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=biom_avg-biom_se,
+                    ymax=biom_avg+biom_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Plant Biomass (gm"^-2*")"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+cv_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="CV",],aes(FireGrzTrt, biom_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=biom_avg-biom_se,
+                    ymax=biom_avg+biom_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Plant Biomass CV")+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+avg_spat_viz+sd_spat_viz+cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
