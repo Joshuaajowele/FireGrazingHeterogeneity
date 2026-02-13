@@ -14,19 +14,27 @@ library(nlme)
 library(see)
 library(patchwork)
 library(phia)
+library(vegan)
+library(codyn)
+library(stringr)
+library(readxl)
 ### Standard Error function
 SE_function<-function(x,na.rm=na.rm){
   SE=sd(x,na.rm=TRUE)/sqrt(length(x))
   return(SE)
 }
 
-#Import plant biomass data####
+#Import data####
+#Import plant biomass data
 biomass_diskpasture<-read_csv("Data_PBG_species/PBG031.csv")%>%
   #remove years before 2013 because 2013 was the year the first cycle of PBG
   #treatment was completed across all unit
   filter(Recyear%in%2013:2023)
 Diskht_data<-read.csv("Data_PBG_species/PBG032.csv")%>%
   filter(Recyear%in%2013:2023)
+#import plant composition data
+pl_sp_comp<-read_csv("Data_PBG_species/PBG011.csv")%>%
+  filter(RecYear%in%2013:2023)
 #BIOMASS####
 ##modify data####
 biomass_reg <- biomass_diskpasture%>%
@@ -134,7 +142,7 @@ biomass_data<-Diskht_data%>%
 
 
 #Create a watershed key for treatment and Unit column to merge with the raw data
-watershed_key <- tibble(Watershed=levels(factor(biomass_data$Watershed)),
+watershed_key <- tibble(Watershed=c("C01A", "C03C","C03A","C03B","C1SB","C3SA","C3SB","C3SC"),
                         FireGrzTrt=c("ABG", "PBG", "PBG", "PBG", "ABG", "PBG", "PBG", "PBG"),
                         Unit=c("south", "south", "south", "south", "north", "north",
                                "north", "north"))
@@ -414,3 +422,33 @@ cv_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="CV",],aes(FireGrzTr
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 avg_spat_viz+sd_spat_viz+cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
+#PLANT COMPOSITION####
+##create required column####
+#Creating a key for converting cover class to abundance 
+cover_key <-data.frame(CoverClass=0:7, abundance=c(0,0.5,3,15,37.5,62.5,85,97.5))
+#need to make watershed & transect all uppercase
+pl_sp_comp$Watershed<-toupper(pl_sp_comp$Watershed)
+pl_sp_comp$Transect<-toupper(pl_sp_comp$Transect)
+#make all genera lowercase for consistency
+pl_sp_comp$Ab_genus<-tolower(pl_sp_comp$Ab_genus)
+pl_sp_comp$Ab_species<-tolower(pl_sp_comp$Ab_species)
+
+##plant species data####
+pl_species_comp<-pl_sp_comp%>%
+  left_join(cover_key, by="CoverClass")%>%
+  #create unique name for species by combining binomial nomenclature
+  mutate(sp=paste(Ab_genus,Ab_species, sep="_"))%>%
+  group_by(Watershed, RecYear,Transect,Plot,SpeCode,sp)%>%
+  #selecting the maximum cover for each species
+  summarise(abundance=max(abundance, na.rm=T))%>%
+  mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
+  #merging key with data
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  left_join(watershed_key, by="Watershed")%>%
+  group_by(Watershed, RecYear,Transect,SpeCode,sp)%>%
+  #average?sum?
+  summarise(abundance=max(abundance, na.rm=T))%>%
+
+##check data####
+unique(pl_species_comp$Plot)
