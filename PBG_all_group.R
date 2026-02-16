@@ -446,9 +446,42 @@ pl_species_comp<-pl_sp_comp%>%
   #merging key with data
   left_join(YrSinceFire_key, by="year_watershed")%>%
   left_join(watershed_key, by="Watershed")%>%
-  group_by(Watershed, RecYear,Transect,SpeCode,sp)%>%
-  #average?sum?
-  summarise(abundance=max(abundance, na.rm=T))%>%
+  group_by(Unit, FireGrzTrt, time_fire, Watershed, RecYear,Transect,SpeCode,sp)%>%
+  #average
+  summarise(abundance=mean(abundance, na.rm=T))%>%
+  group_by(Unit, FireGrzTrt, time_fire, Watershed, RecYear,Transect)%>%
+  mutate(total_abund=sum(abundance))%>%
+  group_by(Unit, FireGrzTrt, time_fire, Watershed, RecYear,Transect,SpeCode,sp)%>%
+  mutate(rel_abund=abundance/total_abund)%>%
+  mutate(rep_id=paste(Unit, Watershed, FireGrzTrt, Transect, sep="_"),
+         wsd_rep=paste(Watershed,Transect, sep="_"))
 
-##check data####
-unique(pl_species_comp$Plot)
+
+##community change calculation yearly in each transect####
+time_change<-multivariate_change(pl_species_comp, species.var="sp",
+                    abundance.var = "rel_abund",
+                    replicate.var="rep_id",
+                    time.var = "RecYear",
+                    treatment.var="wsd_rep")
+
+#combine to have datatset with tretament variablesfor analysis
+t_change<-pl_species_comp%>%
+  ungroup()%>%
+  select(Unit, Watershed, Transect, FireGrzTrt, time_fire, wsd_rep)%>%
+  distinct()%>%
+  left_join(time_change, by="wsd_rep")%>%
+  mutate(year_diff=paste(RecYear, RecYear2, sep="_"))
+t_change$Unit<-as.factor(t_change$Unit)
+t_change$FireGrzTrt<-as.factor(t_change$FireGrzTrt)
+t_change$Watershed<-as.factor(t_change$Watershed)
+t_change$year_diff<-as.factor(t_change$year_diff)
+
+##model for analysis####
+t_ch_m<-lmer(log(composition_change)~FireGrzTrt*year_diff+(1|Unit/Watershed), data=t_change)
+anova(t_ch_m)
+check_model(t_ch_m)
+testInteractions(t_ch_m, pairwise = "FireGrzTrt", fixed="year_diff")
+
+ggplot(t_change,aes(year_diff, composition_change, fill=FireGrzTrt))+
+  geom_boxplot()
+####check temporal change based on 2013 vs 2023!
