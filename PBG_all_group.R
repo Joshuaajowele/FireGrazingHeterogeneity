@@ -404,7 +404,7 @@ sd_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="SD",],aes(FireGrzTr
   geom_errorbar(aes(ymin=biom_avg-biom_se,
                     ymax=biom_avg+biom_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Plant Biomass (gm"^-2*")"))+
+  ylab(label=expression("Plant Biomass SD (gm"^-2*")"))+
   xlab(labe=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
@@ -434,6 +434,7 @@ pl_sp_comp$Transect<-toupper(pl_sp_comp$Transect)
 pl_sp_comp$Ab_genus<-tolower(pl_sp_comp$Ab_genus)
 pl_sp_comp$Ab_species<-tolower(pl_sp_comp$Ab_species)
 
+##Temporal plant comp####
 ##plant species data####
 pl_species_comp<-pl_sp_comp%>%
   left_join(cover_key, by="CoverClass")%>%
@@ -481,7 +482,89 @@ t_ch_m<-lmer(log(composition_change)~FireGrzTrt*year_diff+(1|Unit/Watershed), da
 anova(t_ch_m)
 check_model(t_ch_m)
 testInteractions(t_ch_m, pairwise = "FireGrzTrt", fixed="year_diff")
+##visuals####
+#wrangle data from model
+comp_change_mean<-interactionMeans(t_ch_m)%>%
+  mutate(comp_chang=exp(`adjusted mean`),
+         chang_up=exp(`adjusted mean`+`SE of link`),
+         chang_low=exp(`adjusted mean`-`SE of link`))
 
-ggplot(t_change,aes(year_diff, composition_change, fill=FireGrzTrt))+
-  geom_boxplot()
-####check temporal change based on 2013 vs 2023!
+chang_mean_fig<-ggplot(comp_change_mean,aes(year_diff, comp_chang,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(year_diff)))+
+  geom_errorbar(aes(ymin=chang_low,
+                    ymax=chang_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Composition change"))+
+  xlab(label="Year comparison")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#calculate average 
+chang_avg<-comp_change_mean%>%
+  group_by(FireGrzTrt)%>%
+  summarise(comp_chang_avg=mean(comp_chang, na.rm=T),
+            c_chang_se=SE_function(comp_chang))
+#visual
+avg_chang_viz<-ggplot(chang_avg,aes(FireGrzTrt, comp_chang_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=comp_chang_avg-c_chang_se,
+                    ymax=comp_chang_avg+c_chang_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Composition change")+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+
+##Spatial plant comp####
+###transect scale diversity####
+pl_rich_trsct <- community_structure(pl_species_comp, time.var = "RecYear", 
+                               abundance.var = "abundance",
+                               replicate.var = "rep_id", metric = "Evar")
+#combine with treatmnet info
+rich_trsct<-pl_species_comp%>%
+  ungroup()%>%
+  select(RecYear, Unit, Watershed, Transect, FireGrzTrt, rep_id)%>%
+  distinct()%>%
+  left_join(pl_rich_trsct, by=c("RecYear","rep_id"))
+
+####analysis####
+#convert to factors for analysis
+rich_trsct$RecYear<-as.factor(rich_trsct$RecYear)
+rich_trsct$Unit<-as.factor(rich_trsct$Unit)
+rich_trsct$Watershed<-as.factor(rich_trsct$Watershed)
+rich_trsct$FireGrzTrt<-as.factor(rich_trsct$FireGrzTrt)
+
+rich_trsct_m<-lmer(richness~FireGrzTrt*RecYear+(1|Unit/Watershed), data=rich_trsct)
+check_model(rich_trsct_m)
+anova(rich_trsct_m)
+testInteractions(rich_trsct_m, pairwise = "FireGrzTrt", fixed="RecYear")
+
+even_trsct_m<-lmer(Evar~FireGrzTrt*RecYear+(1|Unit/Watershed), data=rich_trsct)
+check_model(even_trsct_m)
+anova(even_trsct_m)
+
+
+#####visuals#####
+#wrangle data from model
+rich_t<-interactionMeans(rich_trsct_m)%>%
+  mutate(rich =`adjusted mean`,
+         r_up=`adjusted mean`+`SE of link`,
+         r_low=`adjusted mean`-`SE of link`)
+
+rich_trsct_fig<-ggplot(rich_t,aes(RecYear, rich,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=r_low,
+                    ymax=r_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Richness"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
