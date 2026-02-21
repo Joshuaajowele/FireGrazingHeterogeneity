@@ -1,6 +1,6 @@
 #Author: Joshua Ajowele####
 #This script is for plant biomass and species composition response to fire and grazing heterogeneity
-#Date: Feb 6, 2026 Last modified: 
+#Date: Feb 6, 2026 Last modified: 2Feb 20, 2026
 
 #Load library####
 library(tidyverse)
@@ -193,9 +193,9 @@ YrSinceFire_key <- tibble(year_watershed= c("2013_C03A",
 biomass_ready<-biomass_data%>%
   left_join(watershed_key, by="Watershed")%>%
   left_join(YrSinceFire_key, by="year_watershed")%>%
-  group_by(Recyear, Unit, Watershed, FireGrzTrt, Transect, Plotnum)%>%
+  group_by(Recyear, Unit, time_fire,Watershed, FireGrzTrt, Transect, Plotnum)%>%
   summarise(biomass=mean(biomass, na.rm=T))%>%
-  group_by(Recyear, Unit, Watershed, FireGrzTrt,Transect)%>%
+  group_by(Recyear, Unit, time_fire,Watershed, FireGrzTrt,Transect)%>%
   summarise(biomass=mean(biomass, na.rm=T))
   
 ##Temporal analysis at the local/transect scale####
@@ -273,18 +273,7 @@ TBCV_viz<-ggplot(temp_biom_vizdata[temp_biom_vizdata$resp=="biomass_cv",],aes(Fi
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
-#Figure to showw each transect across years
-ggplot(biomass_ready[biomass_ready$biomass<1200,],aes(Recyear, biomass,col=FireGrzTrt, fill=Watershed, shape=Transect))+
-  geom_point(size=5)+
-  geom_path()+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Plant Biomass (gm"^-2*")"))+
-  xlab(label="Year")+
-  theme_bw()+
-  theme(panel.grid.major = element_blank(),  # Remove major gridlines
-        panel.grid.minor = element_blank()   # Remove minor gridlines
-  )+
-  facet_wrap(~Unit)
+
 ###combine figures####
 TBM_viz+TBSD_viz+TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
@@ -292,6 +281,53 @@ TBM_viz+TBSD_viz+TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_l
 
 
 ##Spatial variability at pasture scale####
+
+###time_fire analysis to show differences in PBG patches####
+biom_t_fire<-biomass_ready
+biom_t_fire$Recyear=as.factor(biom_t_fire$Recyear)
+biom_t_fire$Unit=as.factor(biom_t_fire$Unit)
+biom_t_fire$time_fire=as.factor(biom_t_fire$time_fire)
+biom_t_fire$Watershed=as.factor(biom_t_fire$Watershed)
+#model
+t_biom_m<-lmer(log(biomass)~time_fire*Recyear+(1|Unit/Watershed), data=biom_t_fire[biom_t_fire$biomass<3000,])
+check_model(t_biom_m)
+anova(t_biom_m)
+testInteractions(t_biom_m,pairwise = "time_fire")
+####visual####
+t_biom_mean<-interactionMeans(t_biom_m)%>%
+  mutate(biomass=exp(`adjusted mean`),
+         biomass_up=exp(`adjusted mean`+`SE of link`),
+         biomass_low=exp(`adjusted mean`-`SE of link`))
+
+t_fire_biom_fig<-ggplot(t_biom_mean,aes(Recyear, biomass,col=time_fire))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(Recyear)))+
+  geom_errorbar(aes(ymin=biomass_low,
+                    ymax=biomass_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
+  ylab(label=expression("Plant Biomass (gm"^-2*")"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+t_biom_mean_avg<-t_biom_mean%>%
+  group_by(time_fire)%>%
+  summarise(biomass_avg=mean(biomass, na.rm=T),
+            biomass_se=SE_function(biomass))
+
+t_fire_biom_avg_fig<-ggplot(t_biom_mean_avg,aes(time_fire, biomass_avg,col=time_fire))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=biomass_avg-biomass_se,
+                    ymax=biomass_avg+biomass_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
+  ylab(label=expression("Plant Biomass (gm"^-2*")"))+
+  xlab(label="Year since last fire")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
 #wrangle data
 spat_biomdata<-biomass_ready%>%
   group_by(Recyear,Unit,FireGrzTrt)%>%
@@ -405,7 +441,7 @@ sd_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="SD",],aes(FireGrzTr
                     ymax=biom_avg+biom_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Plant Biomass SD (gm"^-2*")"))+
-  xlab(labe=NULL)+
+  xlab(labe="Fire & grazing treatment")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -416,12 +452,12 @@ cv_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="CV",],aes(FireGrzTr
                     ymax=biom_avg+biom_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Plant Biomass CV")+
-  xlab(labe=NULL)+
+  xlab(label="Fire & grazing treatment")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
-avg_spat_viz+sd_spat_viz+cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+t_fire_biom_avg_fig+sd_spat_viz+cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 #PLANT COMPOSITION####
 ##create required column####
@@ -523,7 +559,7 @@ avg_chang_viz<-ggplot(chang_avg,aes(FireGrzTrt, comp_chang_avg,col=FireGrzTrt))+
 ##Spatial plant comp####
 ###transect scale diversity####
 pl_rich_trsct <- community_structure(pl_species_comp, time.var = "RecYear", 
-                               abundance.var = "abundance",
+                               abundance.var = "rel_abund",
                                replicate.var = "rep_id", metric = "Evar")
 #combine with treatmnet info
 rich_trsct<-pl_species_comp%>%
@@ -568,3 +604,38 @@ rich_trsct_fig<-ggplot(rich_t,aes(RecYear, rich,col=FireGrzTrt))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
+###pasture scale####
+#wrangle data
+pl_comp_pasture_scale<-pl_sp_comp%>%
+  left_join(cover_key, by="CoverClass")%>%
+  #create unique name for species by combining binomial nomenclature
+  mutate(sp=paste(Ab_genus,Ab_species, sep="_"))%>%
+  group_by(Watershed, RecYear,Transect,Plot,SpeCode,sp)%>%
+  #selecting the maximum cover for each species
+  summarise(abundance=max(abundance, na.rm=T))%>%
+  mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
+  #merging key with data
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  left_join(watershed_key, by="Watershed")%>%
+  group_by(Unit, FireGrzTrt, RecYear,SpeCode,sp)%>%
+  #average
+  summarise(abundance=mean(abundance, na.rm=T))%>%
+  group_by(Unit, FireGrzTrt, RecYear)%>%
+  mutate(total_abund=sum(abundance))%>%
+  group_by(Unit, FireGrzTrt,  RecYear,SpeCode,sp)%>%
+  mutate(rel_abund=abundance/total_abund)%>%
+  mutate(rep_id=paste(Unit, FireGrzTrt, sep="_"))
+
+###pasture/treatment scale diversity
+pl_rich_past <- community_structure(pl_comp_pasture_scale, time.var = "RecYear", 
+                                     abundance.var = "rel_abund",
+                                     replicate.var = "rep_id", metric = "Evar")
+#combine with treatmnet info
+rich_past<-pl_comp_pasture_scale%>%
+  ungroup()%>%
+  select(RecYear, Unit, FireGrzTrt, rep_id)%>%
+  distinct()%>%
+  left_join(pl_rich_past, by=c("RecYear","rep_id"))
+rich_past$RecYear=as.factor(rich_past$RecYear)
+rich_past$FireGrzTrt=as.factor(rich_past$FireGrzTrt)
+rich_past$Unit=as.factor(rich_past$Unit)
