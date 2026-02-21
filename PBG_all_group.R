@@ -1,6 +1,6 @@
 #Author: Joshua Ajowele####
 #This script is for plant biomass and species composition response to fire and grazing heterogeneity
-#Date: Feb 6, 2026 Last modified: 2Feb 20, 2026
+#Date: Feb 6, 2026 Last modified: Feb 21, 2026
 
 #Load library####
 library(tidyverse)
@@ -604,6 +604,30 @@ rich_trsct_fig<-ggplot(rich_t,aes(RecYear, rich,col=FireGrzTrt))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
+####time_fire transect####
+rich_t_fire_tst<-pl_species_comp%>%
+  ungroup()%>%
+  select(RecYear, Unit, Watershed, Transect, time_fire, rep_id)%>%
+  distinct()%>%
+  left_join(pl_rich_trsct, by=c("RecYear","rep_id"))
+
+####analysis####
+#convert to factors for analysis
+rich_t_fire_tst$RecYear<-as.factor(rich_t_fire_tst$RecYear)
+rich_t_fire_tst$Unit<-as.factor(rich_t_fire_tst$Unit)
+rich_t_fire_tst$Watershed<-as.factor(rich_t_fire_tst$Watershed)
+rich_t_fire_tst$time_fire<-as.factor(rich_t_fire_tst$time_fire)
+
+rich_t_fire_tst_m<-lmer(richness~time_fire*RecYear+(1|Unit/Watershed), data=rich_t_fire_tst)
+check_model(rich_t_fire_tst_m)
+anova(rich_t_fire_tst_m)
+
+even_t_fire_tst_m<-lmer(Evar~time_fire*RecYear+(1|Unit/Watershed), data=rich_t_fire_tst)
+check_model(even_t_fire_tst_m)
+anova(even_t_fire_tst_m)
+testInteractions(even_t_fire_tst_m, pairwise="time_fire")
+ggplot(rich_t_fire_tst, aes(RecYear, richness, col=time_fire))+
+  geom_boxplot()
 ###pasture scale####
 #wrangle data
 pl_comp_pasture_scale<-pl_sp_comp%>%
@@ -639,3 +663,15 @@ rich_past<-pl_comp_pasture_scale%>%
 rich_past$RecYear=as.factor(rich_past$RecYear)
 rich_past$FireGrzTrt=as.factor(rich_past$FireGrzTrt)
 rich_past$Unit=as.factor(rich_past$Unit)
+
+####analysis####
+rich_past_m<-lmer(richness~FireGrzTrt*RecYear+(1|Unit), data=rich_past)
+check_model(rich_past_m)
+anova(rich_past_m)
+testInteractions(rich_past_m, pairwise = "FireGrzTrt")
+even_past_m<-lmer(Evar~FireGrzTrt*RecYear+(1|Unit), data=rich_past)
+check_model(even_past_m)
+anova(even_past_m)
+testInteractions(even_past_m, pairwise = "FireGrzTrt")
+
+####Re-analysis based on selecting PBG samples covering similar area as ABG####
