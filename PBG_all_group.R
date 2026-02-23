@@ -628,7 +628,9 @@ anova(even_t_fire_tst_m)
 testInteractions(even_t_fire_tst_m, pairwise="time_fire")
 ggplot(rich_t_fire_tst, aes(RecYear, richness, col=time_fire))+
   geom_boxplot()
+
 ###pasture scale####
+####selecting PBG samples covering similar area as ABG####
 #wrangle data
 pl_comp_pasture_scale<-pl_sp_comp%>%
   left_join(cover_key, by="CoverClass")%>%
@@ -641,6 +643,22 @@ pl_comp_pasture_scale<-pl_sp_comp%>%
   #merging key with data
   left_join(YrSinceFire_key, by="year_watershed")%>%
   left_join(watershed_key, by="Watershed")%>%
+  filter(Transect!="C" | Watershed!="C03C")%>%
+  filter(Watershed!="C03C" | Transect!="D")%>%
+  filter(Watershed!="C03B" | Transect!="A")%>%
+  filter(Watershed!="C03B" | Transect!="B")%>%
+  filter(Watershed!="C03B" | Transect!="C")%>%
+  filter(Watershed!="C03A" | Transect!="A")%>%
+  filter(Watershed!="C03A" | Transect!="B")%>%
+  filter(Watershed!="C03A" | Transect!="C")%>%
+  filter(Watershed!="C3SC" | Transect!="A")%>%
+  filter(Watershed!="C3SC" | Transect!="B")%>%
+  filter(Watershed!="C3SC" | Transect!="C")%>%
+  filter(Watershed!="C3SA" | Transect!="B")%>%
+  filter(Watershed!="C3SA" | Transect!="C")%>%
+  filter(Watershed!="C3SA" | Transect!="D")%>%
+  filter(Watershed!="C3SB" | Transect!="A")%>%
+  filter(Watershed!="C3SB" | Transect!="B")%>%
   group_by(Unit, FireGrzTrt, RecYear,SpeCode,sp)%>%
   #average
   summarise(abundance=mean(abundance, na.rm=T))%>%
@@ -649,11 +667,10 @@ pl_comp_pasture_scale<-pl_sp_comp%>%
   group_by(Unit, FireGrzTrt,  RecYear,SpeCode,sp)%>%
   mutate(rel_abund=abundance/total_abund)%>%
   mutate(rep_id=paste(Unit, FireGrzTrt, sep="_"))
-
 ###pasture/treatment scale diversity
 pl_rich_past <- community_structure(pl_comp_pasture_scale, time.var = "RecYear", 
-                                     abundance.var = "rel_abund",
-                                     replicate.var = "rep_id", metric = "Evar")
+                                    abundance.var = "rel_abund",
+                                    replicate.var = "rep_id", metric = "Evar")
 #combine with treatmnet info
 rich_past<-pl_comp_pasture_scale%>%
   ungroup()%>%
@@ -668,10 +685,48 @@ rich_past$Unit=as.factor(rich_past$Unit)
 rich_past_m<-lmer(richness~FireGrzTrt*RecYear+(1|Unit), data=rich_past)
 check_model(rich_past_m)
 anova(rich_past_m)
-testInteractions(rich_past_m, pairwise = "FireGrzTrt")
 even_past_m<-lmer(Evar~FireGrzTrt*RecYear+(1|Unit), data=rich_past)
 check_model(even_past_m)
 anova(even_past_m)
-testInteractions(even_past_m, pairwise = "FireGrzTrt")
+####visual####
+rich_past_viz<-interactionMeans(rich_past_m)%>%
+  mutate(rich =`adjusted mean`,
+         r_up=`adjusted mean`+`SE of link`,
+         r_low=`adjusted mean`-`SE of link`)%>%
+  group_by(FireGrzTrt)%>%
+  summarise(richn=mean(rich, na.rm=T),
+            r_upp=mean(r_up, na.rm=T),
+            r_lower=mean(r_low, na.rm=T))
 
-####Re-analysis based on selecting PBG samples covering similar area as ABG####
+rich_past_fig<-ggplot(rich_past_viz,aes(FireGrzTrt, richn,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=r_lower,
+                    ymax=r_upp),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Richness"))+
+  xlab(label="Fire & grazing treatment")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#evenness
+even_past_viz<-interactionMeans(even_past_m)%>%
+  mutate(Evar =`adjusted mean`,
+         e_up=`adjusted mean`+`SE of link`,
+         e_low=`adjusted mean`-`SE of link`)%>%
+  group_by(FireGrzTrt)%>%
+  summarise(Even=mean(Evar, na.rm=T),
+            e_upp=mean(e_up, na.rm=T),
+            e_lower=mean(e_low, na.rm=T))
+
+evar_past_fig<-ggplot(even_past_viz,aes(FireGrzTrt, Even,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=e_lower,
+                    ymax=e_upp),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Evenness"))+
+  xlab(label="Fire & grazing treatment")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
