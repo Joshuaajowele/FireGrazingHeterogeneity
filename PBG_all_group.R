@@ -730,3 +730,39 @@ evar_past_fig<-ggplot(even_past_viz,aes(FireGrzTrt, Even,col=FireGrzTrt))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
+#####
+pl_comp_wide<-pl_comp_pasture_scale%>%
+  ungroup()%>%
+  select(-SpeCode)%>%
+  pivot_wider(names_from = sp, values_from = rel_abund, values_fill = 0)
+  
+# Separate out spcomp and environmental columns (cols are species) #
+pl_sp_data <- sp_comp_comm %>%
+  ungroup()%>%
+  dplyr::select(-1:-7)
+pl_env_data <- sp_comp_comm%>%dplyr::select(1:7)
+#calculating betadiversity by unit####
+#creating a loop to do this
+year_vec_pl <- unique(pl_env_data$RecYear)
+pl_perm_unit <- {}
+pl_beta_unit <- {}
+
+
+for(YEAR in 1:length(year_vec_pl)){
+  vdist_temp_pl_unit <- vegdist(filter(pl_sp_data, pl_env_data$RecYear ==  year_vec_pl[YEAR]))
+  permanova_temp_pl_unit <- adonis(vdist_temp_pl_unit ~ subset(pl_env_data, RecYear == year_vec_pl[YEAR])$unit_trt)
+  permanova_out_temp_pl_unit <- data.frame(RecYear = year_vec_pl[YEAR], 
+                                           DF = permanova_temp_pl_unit$aov.tab[1,1],
+                                           F_value = permanova_temp_pl_unit$aov.tab[1,4],
+                                           P_value = permanova_temp_pl_unit$aov.tab[1,6])
+  pl_perm_unit <- rbind(pl_perm_unit,permanova_out_temp_pl_unit)
+  
+  bdisp_temp_pl_unit <- betadisper(vdist_temp_pl_unit, filter(pl_env_data, RecYear==year_vec_pl[YEAR])$unit_trt, type = "centroid")#compare median and centroid (concatenate)
+  bdisp_out_temp_pl_unit <- data.frame(filter(pl_env_data, RecYear==year_vec_pl[YEAR]), distance = bdisp_temp_pl_unit$distances)
+  pl_beta_unit <- rbind(pl_beta_unit, bdisp_out_temp_pl_unit)
+  
+  rm(vdist_temp_pl_unit, permanova_temp_pl_unit, permanova_out_temp_pl_unit, bdisp_temp_pl_unit, bdisp_out_temp_pl_unit)
+}
+#write.csv(pl_beta_unit, "C:/Users/JAAJOWELE/OneDrive - UNCG/UNCG PHD/Writing/2024_PBG_figures/plant_betadiver_sep_unit.csv")
+#pl_beta_unit<-read_csv("C:/Users/joshua/OneDrive - UNCG/UNCG PHD/Writing/2024_PBG_figures/plant_betadiver_sep_unit.csv")
+#model for betadiversity
