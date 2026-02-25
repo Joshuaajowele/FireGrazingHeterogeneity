@@ -730,19 +730,37 @@ evar_past_fig<-ggplot(even_past_viz,aes(FireGrzTrt, Even,col=FireGrzTrt))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
-#####
-pl_comp_wide<-pl_comp_pasture_scale%>%
+####betadiversity####
+pl_comp_wide<-pl_species_comp%>%
+  filter(Transect!="C" | Watershed!="C03C")%>%
+  filter(Watershed!="C03C" | Transect!="D")%>%
+  filter(Watershed!="C03B" | Transect!="A")%>%
+  filter(Watershed!="C03B" | Transect!="B")%>%
+  filter(Watershed!="C03B" | Transect!="C")%>%
+  filter(Watershed!="C03A" | Transect!="A")%>%
+  filter(Watershed!="C03A" | Transect!="B")%>%
+  filter(Watershed!="C03A" | Transect!="C")%>%
+  filter(Watershed!="C3SC" | Transect!="A")%>%
+  filter(Watershed!="C3SC" | Transect!="B")%>%
+  filter(Watershed!="C3SC" | Transect!="C")%>%
+  filter(Watershed!="C3SA" | Transect!="B")%>%
+  filter(Watershed!="C3SA" | Transect!="C")%>%
+  filter(Watershed!="C3SA" | Transect!="D")%>%
+  filter(Watershed!="C3SB" | Transect!="A")%>%
+  filter(Watershed!="C3SB" | Transect!="B")%>%
   ungroup()%>%
-  select(-SpeCode)%>%
-  pivot_wider(names_from = sp, values_from = rel_abund, values_fill = 0)
+  select(-SpeCode,-rel_abund,-total_abund)%>%
+  distinct()%>%
+  mutate(unit_trt=paste(Unit, FireGrzTrt, sep="_"))%>%
+  pivot_wider(names_from = sp, values_from = abundance, values_fill = 0)
   
-# Separate out spcomp and environmental columns (cols are species) #
-pl_sp_data <- sp_comp_comm %>%
+# Separate pcomp and environmental columns
+pl_sp_data <- pl_comp_wide %>%
   ungroup()%>%
-  dplyr::select(-1:-7)
-pl_env_data <- sp_comp_comm%>%dplyr::select(1:7)
-#calculating betadiversity by unit####
-#creating a loop to do this
+  dplyr::select(-1:-9)
+pl_env_data <- pl_comp_wide%>%dplyr::select(1:9)
+#calculating betadiversity by unit
+#####loop;creating a loop to do this####
 year_vec_pl <- unique(pl_env_data$RecYear)
 pl_perm_unit <- {}
 pl_beta_unit <- {}
@@ -750,19 +768,61 @@ pl_beta_unit <- {}
 
 for(YEAR in 1:length(year_vec_pl)){
   vdist_temp_pl_unit <- vegdist(filter(pl_sp_data, pl_env_data$RecYear ==  year_vec_pl[YEAR]))
-  permanova_temp_pl_unit <- adonis(vdist_temp_pl_unit ~ subset(pl_env_data, RecYear == year_vec_pl[YEAR])$unit_trt)
+  permanova_temp_pl_unit <- adonis2(vdist_temp_pl_unit ~ subset(pl_env_data, RecYear == year_vec_pl[YEAR])$unit_trt)
   permanova_out_temp_pl_unit <- data.frame(RecYear = year_vec_pl[YEAR], 
-                                           DF = permanova_temp_pl_unit$aov.tab[1,1],
-                                           F_value = permanova_temp_pl_unit$aov.tab[1,4],
-                                           P_value = permanova_temp_pl_unit$aov.tab[1,6])
+                                           DF = permanova_temp_pl_unit$Df,
+                                           F_value = permanova_temp_pl_unit$`F`,
+                                           P_value = permanova_temp_pl_unit$`Pr(>F)`)
   pl_perm_unit <- rbind(pl_perm_unit,permanova_out_temp_pl_unit)
   
-  bdisp_temp_pl_unit <- betadisper(vdist_temp_pl_unit, filter(pl_env_data, RecYear==year_vec_pl[YEAR])$unit_trt, type = "centroid")#compare median and centroid (concatenate)
+  bdisp_temp_pl_unit <- betadisper(vdist_temp_pl_unit, filter(pl_env_data, RecYear==year_vec_pl[YEAR])$unit_trt, type = "centroid")
   bdisp_out_temp_pl_unit <- data.frame(filter(pl_env_data, RecYear==year_vec_pl[YEAR]), distance = bdisp_temp_pl_unit$distances)
   pl_beta_unit <- rbind(pl_beta_unit, bdisp_out_temp_pl_unit)
   
   rm(vdist_temp_pl_unit, permanova_temp_pl_unit, permanova_out_temp_pl_unit, bdisp_temp_pl_unit, bdisp_out_temp_pl_unit)
 }
-#write.csv(pl_beta_unit, "C:/Users/JAAJOWELE/OneDrive - UNCG/UNCG PHD/Writing/2024_PBG_figures/plant_betadiver_sep_unit.csv")
-#pl_beta_unit<-read_csv("C:/Users/joshua/OneDrive - UNCG/UNCG PHD/Writing/2024_PBG_figures/plant_betadiver_sep_unit.csv")
-#model for betadiversity
+#write.csv(pl_beta_unit, "Data_PBG_species/plant_beta_sep_unit.csv")
+#write.csv(pl_perm_unit, "Data_PBG_species/plant_perm_sep_unit.csv")
+#pl_beta_unit<-read_csv("Data_PBG_species/plant_beta_sep_unit.csv")
+#####analysis####
+pl_beta_unit$FireGrzTrt=as.factor(pl_beta_unit$FireGrzTrt)
+pl_beta_unit$Unit=as.factor(pl_beta_unit$Unit)
+pl_beta_unit$RecYear=as.factor(pl_beta_unit$RecYear)
+pl_beta_m<-lmer(distance~FireGrzTrt*RecYear+(1|Unit), data=pl_beta_unit)
+check_model(pl_beta_m)
+anova(pl_beta_m)
+testInteractions(pl_beta_m, pairwise = "FireGrzTrt", fixed="RecYear")
+#####visual####
+pl_beta_viz<-interactionMeans(pl_beta_m)%>%
+  mutate(beta =`adjusted mean`,
+         b_up=`adjusted mean`+`SE of link`,
+         b_low=`adjusted mean`-`SE of link`)
+pl_beta_fig<-ggplot(pl_beta_viz,aes(RecYear, beta,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=b_low,
+                    ymax=b_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Betadiversity"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#summarize across years
+pl_beta_viz_avg<-pl_beta_viz%>%
+  group_by(FireGrzTrt)%>%
+  summarise(beta_avg=mean(beta, na.rm=T),
+            b_upp=mean(b_up, na.rm=T),
+            b_lower=mean(b_low, na.rm=T))
+pl_beta_avg_fig<-ggplot(pl_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=b_lower,
+                    ymax=b_upp),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Betadiversity"))+
+  xlab(label=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
