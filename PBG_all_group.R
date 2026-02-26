@@ -826,3 +826,31 @@ pl_beta_avg_fig<-ggplot(pl_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt)
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
+
+####time since fire composition####
+pl_t_fire_comp<-pl_species_comp%>%
+  ungroup()%>%
+  select(-abundance, -total_abund, -rep_id,-wsd_rep,-SpeCode)%>%
+  distinct()%>%
+  pivot_wider(names_from = sp, values_from = rel_abund, values_fill = 0)
+#split environmental and species data
+burn_time_sp_data <- pl_t_fire_comp %>%
+  ungroup()%>%
+  dplyr::select(-1:-6)
+burn_time_env_data <- pl_t_fire_comp%>%dplyr::select(1:6)
+
+#get nmds1 and 2
+burn_time_mds_all <- metaMDS(burn_time_sp_data, distance = "bray",k=3)  
+#combine NMDS1 and 2 with factor columns and create centroids
+burn_time_mds_scores <- data.frame(burn_time_env_data, scores(burn_time_mds_all, display="sites"))%>%
+  group_by(RecYear, Unit,time_fire,Watershed)%>%
+  mutate(NMDS1_mean=mean(NMDS1),
+         NMDS2_mean=mean(NMDS2))
+
+#plotting centroid through time
+ggplot(burn_time_mds_scores, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire))+
+  geom_point(size=8,shape=21, stroke=1)+#selecting shape 21 allows changes to border color
+  scale_shape_manual(values=c(15:18,0:2,5))+
+  scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
+  facet_grid("RecYear")+
+  facet_wrap(~Unit, scales="free")
