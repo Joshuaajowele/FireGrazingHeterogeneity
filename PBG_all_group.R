@@ -1,6 +1,6 @@
 #Author: Joshua Ajowele####
 #This script is for plant biomass and species composition response to fire and grazing heterogeneity
-#Date: Feb 6, 2026 Last modified: Feb 21, 2026
+#Date: Feb 6, 2026 Last modified: March 2, 2026
 
 #Load library####
 library(tidyverse)
@@ -18,6 +18,11 @@ library(vegan)
 library(codyn)
 library(stringr)
 library(readxl)
+#install devtools 
+#install.packages("devtools")
+library(devtools)
+#devtools::install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
+library(pairwiseAdonis)
 ### Standard Error function
 SE_function<-function(x,na.rm=na.rm){
   SE=sd(x,na.rm=TRUE)/sqrt(length(x))
@@ -828,29 +833,77 @@ pl_beta_avg_fig<-ggplot(pl_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt)
   )
 
 ####time since fire composition####
-pl_t_fire_comp<-pl_species_comp%>%
+#separate south and north unit
+pl_t_fire_comp_s<-pl_species_comp%>%
+  filter(Unit=="south")%>%
+  ungroup()%>%
+  select(-abundance, -total_abund, -rep_id,-wsd_rep,-SpeCode)%>%
+  distinct()%>%
+  pivot_wider(names_from = sp, values_from = rel_abund, values_fill = 0)
+pl_t_fire_comp_n<-pl_species_comp%>%
+  filter(Unit=="north")%>%
   ungroup()%>%
   select(-abundance, -total_abund, -rep_id,-wsd_rep,-SpeCode)%>%
   distinct()%>%
   pivot_wider(names_from = sp, values_from = rel_abund, values_fill = 0)
 #split environmental and species data
-burn_time_sp_data <- pl_t_fire_comp %>%
+#south
+burn_time_sp_data_s <- pl_t_fire_comp_s %>%
   ungroup()%>%
   dplyr::select(-1:-6)
-burn_time_env_data <- pl_t_fire_comp%>%dplyr::select(1:6)
+burn_time_env_data_s <- pl_t_fire_comp_s%>%dplyr::select(1:6)
+#north
+burn_time_sp_data_n <- pl_t_fire_comp_n %>%
+  ungroup()%>%
+  dplyr::select(-1:-6)
+burn_time_env_data_n <- pl_t_fire_comp_n%>%dplyr::select(1:6)
 
 #get nmds1 and 2
-burn_time_mds_all <- metaMDS(burn_time_sp_data, distance = "bray",k=3)  
+burn_time_mds_s <- metaMDS(burn_time_sp_data_s, distance = "bray",k=2) 
+burn_time_mds_n <- metaMDS(burn_time_sp_data_n, distance = "bray",k=2) 
 #combine NMDS1 and 2 with factor columns and create centroids
-burn_time_mds_scores <- data.frame(burn_time_env_data, scores(burn_time_mds_all, display="sites"))%>%
+burn_time_mds_scores_s <- data.frame(burn_time_env_data_s, scores(burn_time_mds_s, display="sites"))%>%
+  group_by(RecYear, Unit,time_fire,Watershed)%>%
+  mutate(NMDS1_mean=mean(NMDS1),
+         NMDS2_mean=mean(NMDS2))
+burn_time_mds_scores_n <- data.frame(burn_time_env_data_n, scores(burn_time_mds_n, display="sites"))%>%
   group_by(RecYear, Unit,time_fire,Watershed)%>%
   mutate(NMDS1_mean=mean(NMDS1),
          NMDS2_mean=mean(NMDS2))
 
-#plotting centroid through time
-ggplot(burn_time_mds_scores, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire))+
+#####visual-plotting centroid through time####
+pl_t_s<-ggplot(burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
   geom_point(size=8,shape=21, stroke=1)+#selecting shape 21 allows changes to border color
   scale_shape_manual(values=c(15:18,0:2,5))+
+  scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))
+pl_t_n<-ggplot(burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire))+
+  geom_point(size=8,shape=21, stroke=1)+#selecting shape 21 allows changes to border color
+  scale_shape_manual(values=c(15:18,0:2,5))+
+  scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))
+ggplot(burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
+  geom_point(size=8, stroke=2)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
-  facet_grid("RecYear")+
-  facet_wrap(~Unit, scales="free")
+  scale_shape_manual(values=c(21:24))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+ggplot(burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
+  geom_point(size=8, stroke=2)+
+  scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
+  scale_shape_manual(values=c(21:24))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+ #Check with Kevin
+#####stat #####
+#compare by watershed-south
+dist_south<-vegdist(burn_time_sp_data_s)
+permanova_south<-adonis2(dist_south~burn_time_env_data_s$Watershed+burn_time_env_data_s$time_fire)
+permanova_south<-adonis2(dist_south~burn_time_env_data_s$time_fire+as.factor(burn_time_env_data_s$RecYear)+burn_time_env_data_s$Watershed)
+#write.csv(plant_perm_south_ysinfire,"C:/Users/JAAJOWELE/OneDrive - UNCG/UNCG PHD/Writing/2024_PBG_figures/plant_perma_south_ysinfire_2016_2021.csv")
+#pairwise comparison
+pairwise_south<-pairwise.adonis2(dist_south~time_fire+Watershed, data=burn_time_env_data_s)
+pairwise_south<-pairwise.adonis2(burn_time_sp_data_s~time_fire/Watershed,data=burn_time_env_data_s)
+?pairwise.adonis2
