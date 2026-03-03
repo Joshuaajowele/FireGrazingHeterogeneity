@@ -20,7 +20,7 @@ library(stringr)
 library(readxl)
 #install devtools 
 #install.packages("devtools")
-library(devtools)
+#library(devtools)
 #devtools::install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
 library(pairwiseAdonis)
 ### Standard Error function
@@ -912,13 +912,21 @@ ggplot(burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, s
 #####stat #####
 #compare by watershed-south
 dist_south<-vegdist(burn_time_sp_data_s)
-permanova_south<-adonis2(dist_south~burn_time_env_data_s$Watershed+burn_time_env_data_s$time_fire)
+dist_north<-vegdist(burn_time_sp_data_n)
+permanova_south<-adonis2(dist_south~burn_time_env_data_s$time_fire+burn_time_env_data_s$Watershed+as.factor(burn_time_env_data_s$RecYear), by="terms")
+ermanova_south<-adonis2(dist_south~burn_time_env_data_s$time_fire)
 permanova_south<-adonis2(dist_south~burn_time_env_data_s$time_fire+as.factor(burn_time_env_data_s$RecYear)+burn_time_env_data_s$Watershed)
 #write.csv(plant_perm_south_ysinfire,"C:/Users/JAAJOWELE/OneDrive - UNCG/UNCG PHD/Writing/2024_PBG_figures/plant_perma_south_ysinfire_2016_2021.csv")
 #pairwise comparison
 pairwise_south<-pairwise.adonis2(dist_south~time_fire+Watershed, data=burn_time_env_data_s)
 pairwise_south<-pairwise.adonis2(burn_time_sp_data_s~time_fire/Watershed,data=burn_time_env_data_s)
 #figure this out! Maybe compare time_fire under each watershed and have year as covariates!
+pairwise_south<-pairwise.adonis2(dist_south~time_fire, data=burn_time_env_data_s)
+pairwise_south_w<-pairwise.adonis2(dist_south~Watershed, data=burn_time_env_data_s)
+
+pairwise_north<-pairwise.adonis2(dist_north~time_fire+Watershed+RecYear ,by="terms",data=burn_time_env_data_n)
+pairwise_north_w<-pairwise.adonis2(dist_north~Watershed+time_fire,by="terms", data=burn_time_env_data_n)
+#seems to be a solution
 
 ####lifeform####
 #wrangle data
@@ -959,4 +967,69 @@ pl_comp_life<-pl_comp_past_life%>%
   group_by(Unit,RecYear,FireGrzTrt)%>%
   mutate(t_abund=sum(abund),
          rel_abund=abund/t_abund)
-  
+pl_comp_life$Unit<-as.factor(pl_comp_life$Unit)
+pl_comp_life$RecYear<-as.factor(pl_comp_life$RecYear)
+pl_comp_life$FireGrzTrt<-as.factor(pl_comp_life$FireGrzTrt)
+#####analysis####
+#perennial grass
+peren_grass<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_g",])
+check_model(peren_grass)
+anova(peren_grass)
+pgrass_data<-interactionMeans(peren_grass)%>%
+  mutate(group="perennial graminoid")
+#annual grass
+ann_grass<-lmer(log(rel_abund)~FireGrzTrt+RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="a_g",])
+check_model(ann_grass)#ABG or PBG missing replicates in some years
+anova(ann_grass)
+agrass_data<-interactionMeans(ann_grass)%>%
+  mutate(group="annual graminoid")
+#perennial forbish
+peren_forb<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_f",])
+check_model(peren_forb)
+anova(peren_forb)
+pforb_data<-interactionMeans(peren_forb)%>%
+  mutate(group="perennial forb")
+#annual forb
+ann_forb<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="a_f",])
+check_model(ann_forb)
+anova(ann_forb)
+aforb_data<-interactionMeans(ann_forb)%>%
+  mutate(group="annual forb")
+#woody
+woody<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_w",])
+check_model(woody)
+anova(woody)#need to show the year interaction because of woody cover
+ggplot(data, aes(RecYear, rel_abund, col=FireGrzTrt))+
+  geom_boxplot()
+testInteractions(woody, pairwise="FireGrzTrt", fixed="RecYear")
+woody_data<-interactionMeans(woody)%>%
+  mutate(group="woody")
+#####visual####
+group_data<-pgrass_data%>%
+  bind_rows(agrass_data,aforb_data,pforb_data, woody_data)%>%
+  mutate(upper=(`adjusted mean`+`SE of link`),
+         lower=(`adjusted mean`-`SE of link`),
+         grp_mean=case_when(group=="annual graminoid"~exp(`adjusted mean`),
+                            TRUE~`adjusted mean`),
+         grp_upper=case_when(group=="annual graminoid"~exp(upper),
+                             TRUE~upper),
+         grp_lower=case_when(group=="annual graminoid"~exp(lower),
+                   TRUE~lower))
+grp_data_ready<-group_data%>%
+  group_by(group, FireGrzTrt)%>%
+  summarise(grp_m=mean(grp_mean, na.rm=T),
+            grp_upper=mean(grp_upper, na.rm=T),
+            grp_lower=mean(grp_lower, na.rm=T))
+ggplot(grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=grp_lower,
+                    ymax=grp_upper),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Relative cover")+
+  xlab(label="Group")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+
