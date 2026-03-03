@@ -40,6 +40,18 @@ Diskht_data<-read.csv("Data_PBG_species/PBG032.csv")%>%
 #import plant composition data
 pl_sp_comp<-read_csv("Data_PBG_species/PBG011.csv")%>%
   filter(RecYear%in%2013:2023)
+#import plannt lifeform class
+lifeforms_data<- read_excel("Data_PBG_species/sp_list_update.xlsx")%>%
+  mutate(life_form=paste(growthform,lifeform, sep="_"))%>%
+  rename(SpeCode=code)%>%
+  mutate(life_form=case_when(life_form=="a_s"~"a_g",
+                             life_form=="b_f"~"p_f",
+                             life_form=="p_s"~"p_g",
+                             life_form=="p_o"~"p_f",
+                             life_form=="P_w"~"p_w",
+                             life_form=="a_m"~"a_f",
+                             life_form=="p_m"~"p_f",
+                             TRUE~life_form))
 #BIOMASS####
 ##modify data####
 biomass_reg <- biomass_diskpasture%>%
@@ -906,4 +918,45 @@ permanova_south<-adonis2(dist_south~burn_time_env_data_s$time_fire+as.factor(bur
 #pairwise comparison
 pairwise_south<-pairwise.adonis2(dist_south~time_fire+Watershed, data=burn_time_env_data_s)
 pairwise_south<-pairwise.adonis2(burn_time_sp_data_s~time_fire/Watershed,data=burn_time_env_data_s)
-?pairwise.adonis2
+#figure this out! Maybe compare time_fire under each watershed and have year as covariates!
+
+####lifeform####
+#wrangle data
+pl_comp_past_life<-pl_sp_comp%>%
+  left_join(cover_key, by="CoverClass")%>%
+  #create unique name for species by combining binomial nomenclature
+  mutate(sp=paste(Ab_genus,Ab_species, sep="_"))%>%
+  group_by(Watershed, RecYear,Transect,Plot,SpeCode,sp)%>%
+  #selecting the maximum cover for each species
+  summarise(abundance=max(abundance, na.rm=T))%>%
+  mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
+  #merging key with data
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  left_join(watershed_key, by="Watershed")%>%
+  filter(Transect!="C" | Watershed!="C03C")%>%
+  filter(Watershed!="C03C" | Transect!="D")%>%
+  filter(Watershed!="C03B" | Transect!="A")%>%
+  filter(Watershed!="C03B" | Transect!="B")%>%
+  filter(Watershed!="C03B" | Transect!="C")%>%
+  filter(Watershed!="C03A" | Transect!="A")%>%
+  filter(Watershed!="C03A" | Transect!="B")%>%
+  filter(Watershed!="C03A" | Transect!="C")%>%
+  filter(Watershed!="C3SC" | Transect!="A")%>%
+  filter(Watershed!="C3SC" | Transect!="B")%>%
+  filter(Watershed!="C3SC" | Transect!="C")%>%
+  filter(Watershed!="C3SA" | Transect!="B")%>%
+  filter(Watershed!="C3SA" | Transect!="C")%>%
+  filter(Watershed!="C3SA" | Transect!="D")%>%
+  filter(Watershed!="C3SB" | Transect!="A")%>%
+  filter(Watershed!="C3SB" | Transect!="B")%>%
+  group_by(Unit,RecYear,FireGrzTrt,sp,SpeCode)%>%
+  summarise(abundance=mean(abundance, na.rm=T))%>%
+  left_join(lifeforms_data, by="SpeCode")
+  
+pl_comp_life<-pl_comp_past_life%>%
+  group_by(Unit,RecYear,FireGrzTrt,life_form)%>%
+  summarise(abund=sum(abundance))%>%
+  group_by(Unit,RecYear,FireGrzTrt)%>%
+  mutate(t_abund=sum(abund),
+         rel_abund=abund/t_abund)
+  
