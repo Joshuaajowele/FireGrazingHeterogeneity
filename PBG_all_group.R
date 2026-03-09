@@ -1,6 +1,6 @@
 #Author: Joshua Ajowele####
 #This script is for plant biomass and species composition response to fire and grazing heterogeneity
-#Date: Feb 6, 2026 Last modified: March 2, 2026
+#Date: Feb 6, 2026 Last modified: March 8, 2026
 
 #Load library####
 library(tidyverse)
@@ -885,14 +885,6 @@ burn_time_mds_scores_n <- data.frame(burn_time_env_data_n, scores(burn_time_mds_
 
 #####visual-plotting centroid through time####
 pl_t_s<-ggplot(burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=8,shape=21, stroke=1)+#selecting shape 21 allows changes to border color
-  scale_shape_manual(values=c(15:18,0:2,5))+
-  scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))
-pl_t_n<-ggplot(burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire))+
-  geom_point(size=8,shape=21, stroke=1)+#selecting shape 21 allows changes to border color
-  scale_shape_manual(values=c(15:18,0:2,5))+
-  scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))
-ggplot(burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
   geom_point(size=8, stroke=2)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
   scale_shape_manual(values=c(21:24))+
@@ -900,7 +892,7 @@ ggplot(burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, s
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
-ggplot(burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
+pl_t_n<-ggplot(burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
   geom_point(size=8, stroke=2)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
   scale_shape_manual(values=c(21:24))+
@@ -908,58 +900,43 @@ ggplot(burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, s
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
- #Check with Kevin
+ 
 #####stat #####
-#compare by watershed-south
+#compare by timesince fire include watershed and year
 dist_south<-vegdist(burn_time_sp_data_s)
 dist_north<-vegdist(burn_time_sp_data_n)
 permanova_south<-adonis2(dist_south~burn_time_env_data_s$time_fire+burn_time_env_data_s$Watershed+as.factor(burn_time_env_data_s$RecYear), by="terms")
-ermanova_south<-adonis2(dist_south~burn_time_env_data_s$time_fire)
-permanova_south<-adonis2(dist_south~burn_time_env_data_s$time_fire+as.factor(burn_time_env_data_s$RecYear)+burn_time_env_data_s$Watershed)
-#write.csv(plant_perm_south_ysinfire,"C:/Users/JAAJOWELE/OneDrive - UNCG/UNCG PHD/Writing/2024_PBG_figures/plant_perma_south_ysinfire_2016_2021.csv")
-#pairwise comparison
-pairwise_south<-pairwise.adonis2(dist_south~time_fire+Watershed, data=burn_time_env_data_s)
-pairwise_south<-pairwise.adonis2(burn_time_sp_data_s~time_fire/Watershed,data=burn_time_env_data_s)
-#figure this out! Maybe compare time_fire under each watershed and have year as covariates!
-pairwise_south<-pairwise.adonis2(dist_south~time_fire, data=burn_time_env_data_s)
-pairwise_south_w<-pairwise.adonis2(dist_south~Watershed, data=burn_time_env_data_s)
+permanova_south
+#multiple comparisons
+pairwise_south<-pairwise.adonis2(dist_south~time_fire+Watershed+as.factor(RecYear),by="terms", data=burn_time_env_data_s)
 
-pairwise_north<-pairwise.adonis2(dist_north~time_fire+Watershed+RecYear ,by="terms",data=burn_time_env_data_n)
-pairwise_north_w<-pairwise.adonis2(dist_north~Watershed+time_fire,by="terms", data=burn_time_env_data_n)
-#seems to be a solution
+#comparing time since fire within each watershed to validate
+wat_south<-vegdist(burn_time_sp_data_s[burn_time_env_data_s$Watershed=="C03C",])
+adonis2(wat_south~time_fire+as.factor(RecYear), by="terms", data=burn_time_env_data_s[burn_time_env_data_s$Watershed=="C03C",])
+wat_south<-vegdist(burn_time_sp_data_s[burn_time_env_data_s$Watershed=="C03A",])
+adonis2(wat_south~time_fire+as.factor(RecYear), by="terms", data=burn_time_env_data_s[burn_time_env_data_s$Watershed=="C03A",])
+wat_south<-vegdist(burn_time_sp_data_s[burn_time_env_data_s$Watershed=="C03B",])
+adonis2(wat_south~time_fire+as.factor(RecYear), by="terms", data=burn_time_env_data_s[burn_time_env_data_s$Watershed=="C03B",])
+
+permanova_north<-adonis2(dist_north~burn_time_env_data_n$time_fire+burn_time_env_data_n$Watershed+as.factor(burn_time_env_data_n$RecYear), by="terms")
+permanova_north
+#multiple comparisons
+pairwise.adonis2(dist_north~time_fire+Watershed+as.factor(RecYear),by="terms", data=burn_time_env_data_n)
+
 
 ####lifeform####
 #wrangle data
-pl_comp_past_life<-pl_sp_comp%>%
-  left_join(cover_key, by="CoverClass")%>%
-  #create unique name for species by combining binomial nomenclature
-  mutate(sp=paste(Ab_genus,Ab_species, sep="_"))%>%
-  group_by(Watershed, RecYear,Transect,Plot,SpeCode,sp)%>%
-  #selecting the maximum cover for each species
-  summarise(abundance=max(abundance, na.rm=T))%>%
-  mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
-  #merging key with data
-  left_join(YrSinceFire_key, by="year_watershed")%>%
-  left_join(watershed_key, by="Watershed")%>%
-  filter(Transect!="C" | Watershed!="C03C")%>%
-  filter(Watershed!="C03C" | Transect!="D")%>%
-  filter(Watershed!="C03B" | Transect!="A")%>%
-  filter(Watershed!="C03B" | Transect!="B")%>%
-  filter(Watershed!="C03B" | Transect!="C")%>%
-  filter(Watershed!="C03A" | Transect!="A")%>%
-  filter(Watershed!="C03A" | Transect!="B")%>%
-  filter(Watershed!="C03A" | Transect!="C")%>%
-  filter(Watershed!="C3SC" | Transect!="A")%>%
-  filter(Watershed!="C3SC" | Transect!="B")%>%
-  filter(Watershed!="C3SC" | Transect!="C")%>%
-  filter(Watershed!="C3SA" | Transect!="B")%>%
-  filter(Watershed!="C3SA" | Transect!="C")%>%
-  filter(Watershed!="C3SA" | Transect!="D")%>%
-  filter(Watershed!="C3SB" | Transect!="A")%>%
-  filter(Watershed!="C3SB" | Transect!="B")%>%
-  group_by(Unit,RecYear,FireGrzTrt,sp,SpeCode)%>%
+lifeforms_data$gen=tolower(lifeforms_data$gen)
+lifeforms_data$spec=tolower(lifeforms_data$spec)
+lifeforms_data<-lifeforms_data%>%
+  mutate(sp=paste(gen, spec, sep="_"))
+pl_comp_past_life<-pl_comp_wide%>%
+  pivot_longer(10:179, names_to = "sp", values_to = "abundance")%>%
+  group_by(Unit,RecYear,FireGrzTrt,sp)%>%
   summarise(abundance=mean(abundance, na.rm=T))%>%
-  left_join(lifeforms_data, by="SpeCode")
+  left_join(lifeforms_data, by="sp")%>%
+  mutate(life_form=case_when(sp=="carex_duriu"~"p_g",
+                             TRUE~life_form))
   
 pl_comp_life<-pl_comp_past_life%>%
   group_by(Unit,RecYear,FireGrzTrt,life_form)%>%
@@ -975,14 +952,16 @@ pl_comp_life$FireGrzTrt<-as.factor(pl_comp_life$FireGrzTrt)
 peren_grass<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_g",])
 check_model(peren_grass)
 anova(peren_grass)
+testInteractions(peren_grass,pairwise="FireGrzTrt", fixed="RecYear")
 pgrass_data<-interactionMeans(peren_grass)%>%
   mutate(group="perennial graminoid")
 #annual grass
-ann_grass<-lmer(log(rel_abund)~FireGrzTrt+RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="a_g",])
-check_model(ann_grass)#ABG or PBG missing replicates in some years
+ann_grass<-lmer(sqrt(rel_abund)~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="a_g",])
+check_model(ann_grass)
 anova(ann_grass)
 agrass_data<-interactionMeans(ann_grass)%>%
   mutate(group="annual graminoid")
+
 #perennial forbish
 peren_forb<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_f",])
 check_model(peren_forb)
@@ -998,10 +977,9 @@ aforb_data<-interactionMeans(ann_forb)%>%
 #woody
 woody<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_w",])
 check_model(woody)
-anova(woody)#need to show the year interaction because of woody cover
-ggplot(data, aes(RecYear, rel_abund, col=FireGrzTrt))+
+anova(woody)
+ggplot(pl_comp_life[pl_comp_life$life_form=="p_w",], aes(RecYear, rel_abund, col=FireGrzTrt))+
   geom_boxplot()
-testInteractions(woody, pairwise="FireGrzTrt", fixed="RecYear")
 woody_data<-interactionMeans(woody)%>%
   mutate(group="woody")
 #####visual####
@@ -1009,27 +987,53 @@ group_data<-pgrass_data%>%
   bind_rows(agrass_data,aforb_data,pforb_data, woody_data)%>%
   mutate(upper=(`adjusted mean`+`SE of link`),
          lower=(`adjusted mean`-`SE of link`),
-         grp_mean=case_when(group=="annual graminoid"~exp(`adjusted mean`),
-                            TRUE~`adjusted mean`),
-         grp_upper=case_when(group=="annual graminoid"~exp(upper),
-                             TRUE~upper),
-         grp_lower=case_when(group=="annual graminoid"~exp(lower),
-                   TRUE~lower))
+         grp_mean=case_when(group=="annual graminoid"~(`adjusted mean`)^2,
+                                                      TRUE~`adjusted mean`),
+         grp_upper=case_when(group=="annual graminoid"~(upper)^2,
+                                                          TRUE~upper),
+         grp_lower=case_when(group=="annual graminoid"~(lower)^2,
+                                               TRUE~lower))
 grp_data_ready<-group_data%>%
   group_by(group, FireGrzTrt)%>%
   summarise(grp_m=mean(grp_mean, na.rm=T),
             grp_upper=mean(grp_upper, na.rm=T),
             grp_lower=mean(grp_lower, na.rm=T))
-ggplot(grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
+Pl_group<-ggplot(grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
   geom_point(size=5)+
   geom_errorbar(aes(ymin=grp_lower,
                     ymax=grp_upper),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Relative cover")+
-  xlab(label="Group")+
+  xlab(label="Plant group")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 
+#are woody relative cover increasing with year
+woody_l<-lmer(rel_abund~FireGrzTrt+RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_w",])
+woody_l<-lm(log(rel_abund)~FireGrzTrt*as.numeric(RecYear),data=pl_comp_life[pl_comp_life$life_form=="p_w",])
+anova(woody_l)
+check_model(woody_l)
+summary(woody_l)
+ggplot(data=pl_comp_life[pl_comp_life$life_form=="p_w",], aes(as.numeric(RecYear), rel_abund, col=FireGrzTrt))+
+  geom_point()+
+  geom_smooth(method="lm")+
+  facet_wrap(~Unit)
+#result much pronounced in south unit which is the unit we have bird data for
+data=pl_comp_life[pl_comp_life$life_form=="p_w",]
+woody_l<-lm(rel_abund~FireGrzTrt*as.numeric(RecYear),data=data[data$Unit=="south",])
+summary(woody_l)#0.889-Adjsuted r square
+check_model(woody_l)
+ggplot(data[data$Unit=="south",], aes(RecYear, rel_abund, col=FireGrzTrt))+
+  geom_point(size=3)+
+  geom_smooth(method="lm", aes(as.numeric(RecYear)))+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Relative woody cover")+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
 
+  
