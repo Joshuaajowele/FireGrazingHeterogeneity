@@ -40,7 +40,7 @@ Diskht_data<-read.csv("Data_PBG_species/PBG032.csv")%>%
 #import plant composition data
 pl_sp_comp<-read_csv("Data_PBG_species/PBG011.csv")%>%
   filter(RecYear%in%2013:2023)
-#import plannt lifeform class
+#import plant lifeform class
 lifeforms_data<- read_excel("Data_PBG_species/sp_list_update.xlsx")%>%
   mutate(life_form=paste(growthform,lifeform, sep="_"))%>%
   rename(SpeCode=code)%>%
@@ -52,6 +52,9 @@ lifeforms_data<- read_excel("Data_PBG_species/sp_list_update.xlsx")%>%
                              life_form=="a_m"~"a_f",
                              life_form=="p_m"~"p_f",
                              TRUE~life_form))
+#import grasshopper data
+grasshopperspcomp_df_raw <- read.csv("Data_PBG_species/PBG073.csv")%>%
+  filter(Recyear%in%2013:2023)
 #BIOMASS####
 ##modify data####
 biomass_reg <- biomass_diskpasture%>%
@@ -158,7 +161,7 @@ biomass_data<-Diskht_data%>%
          year_watershed=paste(Recyear,Watershed,sep="_"))
 
 
-#Create a watershed key for treatment and Unit column to merge with the raw data
+#keys for treatment and Unit column to merge with the raw data####
 watershed_key <- tibble(Watershed=c("C01A", "C03C","C03A","C03B","C1SB","C3SA","C3SB","C3SC"),
                         FireGrzTrt=c("ABG", "PBG", "PBG", "PBG", "ABG", "PBG", "PBG", "PBG"),
                         Unit=c("south", "south", "south", "south", "north", "north",
@@ -1036,4 +1039,209 @@ ggplot(data[data$Unit=="south",], aes(RecYear, rel_abund, col=FireGrzTrt))+
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 
-  
+#GRASSHOPPER####
+#wrangle data
+grasshopperspcomp_df <- grasshopperspcomp_df_raw %>% 
+  mutate(Watershed = replace (Watershed, Watershed == "0c1a", "C01A"),
+         Watershed = replace (Watershed, Watershed == "0c3a", "SC03A"),
+         Watershed = replace (Watershed, Watershed == "0c3b", "C03B"),
+         Watershed = replace (Watershed, Watershed == "0c3c", "C03C"),
+         Watershed = replace (Watershed, Watershed == "c01a", "C01A"),
+         Watershed = replace (Watershed, Watershed == "c03a", "C03A"),
+         Watershed = replace (Watershed, Watershed == "c03b", "C03B"),
+         Watershed = replace (Watershed, Watershed == "c03c", "C03C"),
+         Watershed = replace (Watershed, Watershed == "c1sb", "C1SB"),
+         Watershed = replace (Watershed, Watershed == "c3sa", "C3SA"),
+         Watershed = replace (Watershed, Watershed == "c3sb", "C3SB"),
+         Watershed = replace (Watershed, Watershed == "c3sc", "C3SC"),
+         Watershed = replace (Watershed, Watershed == "c1a", "C01A"),
+         Watershed = replace (Watershed, Watershed == "c3a", "C03A"),
+         Watershed = replace (Watershed, Watershed == "c3b", "C03B"),
+         Watershed = replace (Watershed, Watershed == "c3c", "C03C"))
+
+#converting all repsite into uppercase
+grasshopperspcomp_df$Repsite=toupper(grasshopperspcomp_df$Repsite)
+#checking species 
+species_list<-unique(grasshopperspcomp_df$Species)%>%
+  tibble()
+species_list<-unique(grasshopperspcomp_df$Species[grasshopperspcomp_df$Recyear>=2022])%>%
+  tibble()
+#merging key with dataset and removing katydid, etc
+grassh_count_df <- grasshopperspcomp_df%>%
+  left_join(watershed_key, by = "Watershed")%>%
+  mutate(RecYear = Recyear)%>%
+  filter(!Species%in%c("Oecanthinae spp.","Tettigoniidae spp.","Gryllidae spp.",
+                   "Conocephalus spp.","Neoconocephalus robustus","Scudderia texensis",
+                   "Arethaea constricta","Orchelimum spp.","Amblycorypha oblongifolia","Pediodectes haldemani",
+                   "Amblycorypha rotundifolia","Neoconocephalus spp.","Neoconocephalus ensiger","Pediodectes nigromarginatus",
+                   "Scudderia furcata","Scudderia spp."))%>%
+  #using the max cover from the two sweeps done on each transect
+  group_by(Unit,RecYear,FireGrzTrt,Watershed,Repsite,Species)%>%
+  summarise(Total=max(Total))%>%
+  group_by(Unit,RecYear,FireGrzTrt,Watershed,Repsite)%>%
+  #calculate total count per repsite
+  summarise(Tcount=sum(Total, na.rm=T))%>%
+  ungroup()
+##Temporal analysis at the local/transect scale####
+#prepare data
+g_temp_countdata<-grassh_count_df%>%
+  group_by(Unit, Watershed, FireGrzTrt, Repsite)%>%
+  summarise(temp_count=mean(Tcount, na.rm=T),
+            temp_count_sd=sd(Tcount),
+            temp_count_cv=temp_count_sd/temp_count)
+#convert charcter to factors
+g_temp_countdata$Unit=as.factor(g_temp_countdata$Unit)
+g_temp_countdata$Watershed=as.factor(g_temp_countdata$Watershed)  
+g_temp_countdata$Repsite=as.factor(g_temp_countdata$Repsite)
+g_temp_countdata$FireGrzTrt=as.factor(g_temp_countdata$FireGrzTrt)
+#start analysis
+#temporal mean
+g_temp_mean_m<-lmer(temp_count~FireGrzTrt+(1|Unit/Watershed), data=g_temp_countdata)
+check_model(g_temp_mean_m)
+anova(g_temp_mean_m)
+#temporal variability
+g_temp_sd_m<-lmer(log(temp_count_sd)~FireGrzTrt+(1|Unit/Watershed), data=g_temp_countdata)
+check_model(g_temp_sd_m)
+check_outliers(g_temp_sd_m)
+anova(g_temp_sd_m)
+#remove outlier from data
+ggg<-g_temp_countdata%>%
+   filter(Watershed!="C3SC"|Repsite!="D")
+#run without outlier
+g_temp_sd_m<-lmer(log(temp_count_sd)~FireGrzTrt+(1|Unit/Watershed), data=ggg)
+check_model(g_temp_sd_m)
+anova(g_temp_sd_m)#result similar with/without outlier
+
+g_temp_cv_m<-lmer(log(temp_count_cv)~FireGrzTrt+(1|Unit/Watershed), data=g_temp_countdata)
+check_model(g_temp_cv_m)
+anova(g_temp_cv_m)
+
+##visuals####
+g_TBM<-interactionMeans(g_temp_mean_m)%>%
+  mutate(resp="count_mean")
+g_TBSD<-interactionMeans(g_temp_sd_m)%>%
+  mutate(resp="count_sd")
+g_TBCV<-interactionMeans(g_temp_cv_m)%>%
+  mutate(resp="count_cv")
+g_temp_count_vizdata<-g_TBM%>%
+  bind_rows(g_TBSD,g_TBCV)%>%
+  mutate(avg=case_when(resp=="count_sd"~exp(`adjusted mean`),
+                      resp=="count_cv"~exp(`adjusted mean`),
+                      TRUE~`adjusted mean`),
+         up=case_when(resp=="count_sd"~exp(`adjusted mean`+`SE of link`),
+                     resp=="count_cv"~exp(`adjusted mean`+`SE of link`),
+                     TRUE~(`adjusted mean`+`SE of link`)),
+         low=case_when(resp=="count_sd"~exp(`adjusted mean`-`SE of link`),
+                      resp=="count_cv"~exp(`adjusted mean`-`SE of link`),
+                      TRUE~(`adjusted mean`-`SE of link`)))
+
+g_TBM_viz<-ggplot(g_temp_count_vizdata[g_temp_count_vizdata$resp=="count_mean",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper abundance"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+g_TBCV_viz<-ggplot(g_temp_count_vizdata[g_temp_count_vizdata$resp=="count_sd",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper SD"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+g_TBCV_viz<-ggplot(g_temp_count_vizdata[g_temp_count_vizdata$resp=="count_cv",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper CV"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+###combine figures####
+g_TBM_viz+g_TBSD_viz+g_TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
+##Spatial variability at pasture scale####
+grass_count_tfire<-grassh_count_df%>%
+  mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
+  left_join(YrSinceFire_key, by="year_watershed")
+
+###time_fire analysis to show differences in PBG patches####
+grass_count_tfire$RecYear=as.factor(grass_count_tfire$RecYear)
+grass_count_tfire$Unit=as.factor(grass_count_tfire$Unit)
+grass_count_tfire$time_fire=as.factor(grass_count_tfire$time_fire)
+grass_count_tfire$Watershed=as.factor(grass_count_tfire$Watershed)
+#model
+g_t_count_m<-lmer(log(Tcount)~time_fire*RecYear+(1|Unit/Watershed), data=grass_count_tfire)
+check_model(g_t_count_m)
+anova(g_t_count_m)
+testInteractions(g_t_count_m,pairwise = "time_fire", fixed="RecYear")
+testInteractions(g_t_count_m,pairwise = "time_fire")
+
+g_t_count_mean<-interactionMeans(g_t_count_m)%>%
+  mutate(count_m=exp(`adjusted mean`),
+         count_up=exp(`adjusted mean`+`SE of link`),
+         count_low=exp(`adjusted mean`-`SE of link`))
+
+g_t_fire_count_fig<-ggplot(g_t_count_mean,aes(RecYear, count_m,col=time_fire))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=count_low,
+                    ymax=count_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
+  ylab(label=expression("Grasshopper abundance"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+g_t_c_mean_avg<-g_t_count_mean%>%
+  group_by(time_fire)%>%
+  summarise(count_avg=mean(count_m, na.rm=T),
+            count_se=SE_function(count_m))
+
+g_t_fire_c_avg_fig<-ggplot(g_t_c_mean_avg,aes(time_fire, count_avg,col=time_fire))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=count_avg-count_se,
+                    ymax=count_avg+count_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
+  ylab(label=expression("Grasshopper abundance"))+
+  xlab(label="Year since last fire")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#wrangle data
+g_spat_cdata<-grass_count_tfire%>%
+  group_by(RecYear,Unit,FireGrzTrt)%>%
+  summarise(spat_c=mean(Tcount, na.rm=T),
+            spat_c_sd=sd(Tcount),
+            spat_c_cv=spat_c_sd/spat_c)
+#convert character to factors
+g_spat_cdata$Unit=as.factor(g_spat_cdata$Unit)
+g_spat_cdata$FireGrzTrt=as.factor(g_spat_cdata$FireGrzTrt)
+g_spat_cdata$RecYear=as.factor(g_spat_cdata$RecYear)
+#analysis
+g_spat_c_m<-lmer(spat_c~FireGrzTrt*RecYear+(1|Unit), data=g_spat_cdata)
+check_model(g_spat_c_m)
+anova(g_spat_c_m)
+testInteractions(g_spat_c_m, pairwise = "FireGrzTrt", fixed="RecYear")
+#SD
+g_spat_c_sd<-lmer(log(spat_c_sd)~FireGrzTrt*RecYear+(1|Unit), data=g_spat_cdata)
+check_model(g_spat_c_sd)
+anova(g_spat_c_sd)
+#cv
+g_spat_c_cv<-lmer(spat_c_cv~FireGrzTrt*RecYear+(1|Unit), data=g_spat_cdata)
+check_model(g_spat_c_cv)
+anova(g_spat_c_sd)
