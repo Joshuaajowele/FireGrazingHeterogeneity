@@ -1044,7 +1044,7 @@ ggplot(data[data$Unit=="south",], aes(RecYear, rel_abund, col=FireGrzTrt))+
 #wrangle data
 grasshopperspcomp_df <- grasshopperspcomp_df_raw %>% 
   mutate(Watershed = replace (Watershed, Watershed == "0c1a", "C01A"),
-         Watershed = replace (Watershed, Watershed == "0c3a", "SC03A"),
+         Watershed = replace (Watershed, Watershed == "0c3a", "C03A"),
          Watershed = replace (Watershed, Watershed == "0c3b", "C03B"),
          Watershed = replace (Watershed, Watershed == "0c3c", "C03C"),
          Watershed = replace (Watershed, Watershed == "c01a", "C01A"),
@@ -1059,7 +1059,7 @@ grasshopperspcomp_df <- grasshopperspcomp_df_raw %>%
          Watershed = replace (Watershed, Watershed == "c3a", "C03A"),
          Watershed = replace (Watershed, Watershed == "c3b", "C03B"),
          Watershed = replace (Watershed, Watershed == "c3c", "C03C"))
-
+unique(grasshopperspcomp_df$Watershed)
 #converting all repsite into uppercase
 grasshopperspcomp_df$Repsite=toupper(grasshopperspcomp_df$Repsite)
 #checking species 
@@ -1362,4 +1362,245 @@ grassh_comm_df <- grasshopperspcomp_df%>%
                        "Scudderia furcata","Scudderia spp."))%>%
   #using the max count from the two diff survey done on each transect
   group_by(Unit,RecYear,FireGrzTrt,Watershed,Repsite,Species)%>%
-  summarise(Total=max(Total))
+  summarise(gcount=max(Total))
+grassh_tcomm_df<-grassh_comm_df%>%
+  group_by(Unit, FireGrzTrt,Watershed, RecYear,Repsite)%>%
+  mutate(total_count=sum(gcount))%>%
+  group_by(Unit, FireGrzTrt, Watershed, RecYear,Repsite,Species)%>%
+  mutate(rel_abund=gcount/total_count)%>%
+  mutate(rep_id=paste(Unit, Watershed, FireGrzTrt, Repsite, sep="_"),
+         wsd_rep=paste(Watershed,Repsite, sep="_"))
+
+##community change calculation yearly in each transect####
+g_time_change<-multivariate_change(grassh_tcomm_df, species.var="Species",
+                                 abundance.var = "rel_abund",
+                                 replicate.var="rep_id",
+                                 time.var = "RecYear",
+                                 treatment.var="wsd_rep")
+
+#combine to have datatset with tretament variables for analysis
+g_t_change<-grassh_tcomm_df%>%
+  ungroup()%>%
+  select(Unit, Watershed, Repsite, FireGrzTrt, wsd_rep)%>%
+  distinct()%>%
+  left_join(g_time_change, by="wsd_rep")%>%
+  mutate(year_diff=paste(RecYear, RecYear2, sep="_"))
+g_t_change$Unit<-as.factor(g_t_change$Unit)
+g_t_change$FireGrzTrt<-as.factor(g_t_change$FireGrzTrt)
+g_t_change$Watershed<-as.factor(g_t_change$Watershed)
+g_t_change$year_diff<-as.factor(g_t_change$year_diff)
+
+##model for analysis####
+g_t_ch_m<-lmer(composition_change~FireGrzTrt*year_diff+(1|Unit/Watershed), data=g_t_change)
+check_model(g_t_ch_m)
+anova(g_t_ch_m)
+testInteractions(g_t_ch_m, pairwise = "FireGrzTrt")
+##visuals####
+#wrangle data from model
+g_comp_change_mean<-interactionMeans(g_t_ch_m)%>%
+  mutate(comp_chang=(`adjusted mean`),
+         chang_up=(`adjusted mean`+`SE of link`),
+         chang_low=(`adjusted mean`-`SE of link`))
+
+g_chang_mean_fig<-ggplot(g_comp_change_mean,aes(year_diff, comp_chang,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(year_diff)))+
+  geom_errorbar(aes(ymin=chang_low,
+                    ymax=chang_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper composition change"))+
+  xlab(label="Year comparison")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#calculate average 
+g_chang_avg<-g_comp_change_mean%>%
+  group_by(FireGrzTrt)%>%
+  summarise(comp_chang_avg=mean(comp_chang, na.rm=T),
+            c_chang_se=SE_function(comp_chang))
+#visual
+g_avg_chang_viz<-ggplot(g_chang_avg,aes(FireGrzTrt, comp_chang_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=comp_chang_avg-c_chang_se,
+                    ymax=comp_chang_avg+c_chang_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Grasshopper composition change")+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+##Spatial grassh comp####
+###transect scale diversity####
+g_rich_trsct <- community_structure(grassh_tcomm_df, time.var = "RecYear", 
+                                     abundance.var = "rel_abund",
+                                     replicate.var = "rep_id", metric = "Evar")
+#combine with treatmnet info
+g_rich_trsct<-grassh_tcomm_df%>%
+  ungroup()%>%
+  select(RecYear, Unit, Watershed, Repsite, FireGrzTrt, rep_id)%>%
+  distinct()%>%
+  left_join(g_rich_trsct, by=c("RecYear","rep_id"))
+
+####analysis####
+#convert to factors for analysis
+g_rich_trsct$RecYear<-as.factor(g_rich_trsct$RecYear)
+g_rich_trsct$Unit<-as.factor(g_rich_trsct$Unit)
+g_rich_trsct$Watershed<-as.factor(g_rich_trsct$Watershed)
+g_rich_trsct$FireGrzTrt<-as.factor(g_rich_trsct$FireGrzTrt)
+
+g_rich_trsct_m<-lmer(richness~FireGrzTrt*RecYear+(1|Unit/Watershed), data=g_rich_trsct)
+check_model(g_rich_trsct_m)
+anova(g_rich_trsct_m)
+testInteractions(g_rich_trsct_m, pairwise = "FireGrzTrt")
+
+g_even_trsct_m<-lmer(Evar~FireGrzTrt*RecYear+(1|Unit/Watershed), data=g_rich_trsct)
+check_model(g_even_trsct_m)
+anova(g_even_trsct_m)
+testInteractions(g_even_trsct_m, pairwise = "FireGrzTrt")
+
+#####visuals#####
+#wrangle data from model
+g_rich_t<-interactionMeans(g_rich_trsct_m)%>%
+  mutate(rich =`adjusted mean`,
+         r_up=`adjusted mean`+`SE of link`,
+         r_low=`adjusted mean`-`SE of link`)
+
+g_rich_trsct_fig<-ggplot(g_rich_t,aes(RecYear, rich,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=r_low,
+                    ymax=r_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper richness"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+####time_fire transect####
+grassh_tcomm_df$RecYear<-as.factor(grassh_tcomm_df$RecYear)
+g_rich_t_fire_tst<-grassh_tcomm_df%>%
+  ungroup()%>%
+  mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  select(RecYear, Unit, Watershed, Repsite, time_fire, rep_id)%>%
+  distinct()%>%
+  left_join(g_rich_trsct, by=c("RecYear","rep_id","Watershed","Unit","Repsite"))
+
+####analysis####
+#convert to factors for analysis
+g_rich_t_fire_tst$Unit<-as.factor(g_rich_t_fire_tst$Unit)
+g_rich_t_fire_tst$Watershed<-as.factor(g_rich_t_fire_tst$Watershed)
+g_rich_t_fire_tst$time_fire<-as.factor(g_rich_t_fire_tst$time_fire)
+
+g_rich_t_fire_tst_m<-lmer(richness~time_fire*RecYear+(1|Unit/Watershed), data=g_rich_t_fire_tst)
+check_model(g_rich_t_fire_tst_m)
+anova(g_rich_t_fire_tst_m)
+testInteractions(g_rich_t_fire_tst_m, pairwise="time_fire", fixed="RecYear")
+testInteractions(g_rich_t_fire_tst_m, pairwise="time_fire")
+
+g_even_t_fire_tst_m<-lmer(Evar~time_fire*RecYear+(1|Unit/Watershed), data=g_rich_t_fire_tst)
+check_model(g_even_t_fire_tst_m)
+anova(g_even_t_fire_tst_m)
+testInteractions(g_even_t_fire_tst_m, pairwise="time_fire", fixed="RecYear")
+testInteractions(g_even_t_fire_tst_m, pairwise="time_fire")
+ggplot(g_rich_t_fire_tst, aes(RecYear, richness, col=time_fire))+
+  geom_boxplot()
+ggplot(g_rich_t_fire_tst, aes(RecYear, Evar, col=time_fire))+
+  geom_boxplot()
+
+###pasture scale####
+####selecting PBG samples covering similar area as ABG####
+#wrangle data
+g_comp_pasture<-grassh_comm_df%>%
+  filter(Repsite!="C" | Watershed!="C03C")%>%
+  filter(Watershed!="C03C" | Repsite!="D")%>%
+  filter(Watershed!="C03B" | Repsite!="A")%>%
+  filter(Watershed!="C03B" | Repsite!="B")%>%
+  filter(Watershed!="C03B" | Repsite!="C")%>%
+  filter(Watershed!="C03A" | Repsite!="A")%>%
+  filter(Watershed!="C03A" | Repsite!="B")%>%
+  filter(Watershed!="C03A" | Repsite!="C")%>%
+  filter(Watershed!="C3SC" | Repsite!="A")%>%
+  filter(Watershed!="C3SC" | Repsite!="B")%>%
+  filter(Watershed!="C3SC" | Repsite!="C")%>%
+  filter(Watershed!="C3SA" | Repsite!="B")%>%
+  filter(Watershed!="C3SA" | Repsite!="C")%>%
+  filter(Watershed!="C3SA" | Repsite!="D")%>%
+  filter(Watershed!="C3SB" | Repsite!="A")%>%
+  filter(Watershed!="C3SB" | Repsite!="B")%>%
+  group_by(Unit, FireGrzTrt, RecYear,Species)%>%
+  #average
+  summarise(abundance=mean(gcount, na.rm=T))%>%
+  group_by(Unit, FireGrzTrt, RecYear)%>%
+  mutate(total_abund=sum(abundance))%>%
+  group_by(Unit, FireGrzTrt,  RecYear,Species)%>%
+  mutate(rel_abund=abundance/total_abund)%>%
+  mutate(rep_id=paste(Unit, FireGrzTrt, sep="_"))
+###pasture/treatment scale diversity
+g_rich_past <- community_structure(g_comp_pasture, time.var = "RecYear", 
+                                    abundance.var = "rel_abund",
+                                    replicate.var = "rep_id", metric = "Evar")
+#combine with treatmnet info
+g_rich_past<-g_comp_pasture%>%
+  ungroup()%>%
+  select(RecYear, Unit, FireGrzTrt, rep_id)%>%
+  distinct()%>%
+  left_join(g_rich_past, by=c("RecYear","rep_id"))
+g_rich_past$RecYear=as.factor(g_rich_past$RecYear)
+g_rich_past$FireGrzTrt=as.factor(g_rich_past$FireGrzTrt)
+g_rich_past$Unit=as.factor(g_rich_past$Unit)
+
+####analysis####
+g_rich_past_m<-lmer(richness~FireGrzTrt*RecYear+(1|Unit), data=g_rich_past)
+check_model(g_rich_past_m)
+anova(g_rich_past_m)
+testInteractions(g_rich_past_m, pairwise="FireGrzTrt")
+g_even_past_m<-lmer(Evar~FireGrzTrt*RecYear+(1|Unit), data=g_rich_past)
+check_model(g_even_past_m)
+anova(g_even_past_m)
+testInteractions(g_even_past_m, pairwise="FireGrzTrt")
+####visual####
+g_rich_past_viz<-interactionMeans(g_rich_past_m)%>%
+  mutate(rich =`adjusted mean`,
+         r_up=`adjusted mean`+`SE of link`,
+         r_low=`adjusted mean`-`SE of link`)%>%
+  group_by(FireGrzTrt)%>%
+  summarise(richn=mean(rich, na.rm=T),
+            r_upp=mean(r_up, na.rm=T),
+            r_lower=mean(r_low, na.rm=T))
+
+g_rich_past_fig<-ggplot(g_rich_past_viz,aes(FireGrzTrt, richn,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=r_lower,
+                    ymax=r_upp),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper richness"))+
+  xlab(label="Fire & grazing treatment")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#evenness
+g_even_past_viz<-interactionMeans(g_even_past_m)%>%
+  mutate(Evar =`adjusted mean`,
+         e_up=`adjusted mean`+`SE of link`,
+         e_low=`adjusted mean`-`SE of link`)%>%
+  group_by(FireGrzTrt)%>%
+  summarise(Even=mean(Evar, na.rm=T),
+            e_upp=mean(e_up, na.rm=T),
+            e_lower=mean(e_low, na.rm=T))
+
+g_evar_past_fig<-ggplot(g_even_past_viz,aes(FireGrzTrt, Even,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=e_lower,
+                    ymax=e_upp),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper evenness"))+
+  xlab(label="Fire & grazing treatment")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
