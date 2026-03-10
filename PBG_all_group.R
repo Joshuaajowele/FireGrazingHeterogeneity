@@ -477,6 +477,7 @@ cv_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="CV",],aes(FireGrzTr
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
+###combine####
 t_fire_biom_avg_fig+sd_spat_viz+cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 #PLANT COMPOSITION####
@@ -1146,7 +1147,7 @@ g_TBM_viz<-ggplot(g_temp_count_vizdata[g_temp_count_vizdata$resp=="count_mean",]
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
-g_TBCV_viz<-ggplot(g_temp_count_vizdata[g_temp_count_vizdata$resp=="count_sd",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
+g_TBSD_viz<-ggplot(g_temp_count_vizdata[g_temp_count_vizdata$resp=="count_sd",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
   geom_point(size=5)+
   geom_errorbar(aes(ymin=low,
                     ymax=up),width=0.0125)+
@@ -1244,4 +1245,121 @@ anova(g_spat_c_sd)
 #cv
 g_spat_c_cv<-lmer(spat_c_cv~FireGrzTrt*RecYear+(1|Unit), data=g_spat_cdata)
 check_model(g_spat_c_cv)
-anova(g_spat_c_sd)
+anova(g_spat_c_cv)
+testInteractions(g_spat_c_cv,pairwise = "FireGrzTrt")
+##visuals####
+gcount_mean<-interactionMeans(g_spat_c_m)%>%
+  mutate(count_m=(`adjusted mean`),
+         c_up=(`adjusted mean`+`SE of link`),
+         c_low=(`adjusted mean`-`SE of link`),
+         variab="AVG")
+
+count_mean_fig<-ggplot(gcount_mean,aes(RecYear, count_m,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=c_low,
+                    ymax=c_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper abundance"))+
+  xlab(label=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+gcount_sd<-interactionMeans(g_spat_c_sd)%>%
+  mutate(count_m=exp(`adjusted mean`),
+         c_up=exp(`adjusted mean`+`SE of link`),
+         c_low=exp(`adjusted mean`-`SE of link`),
+         variab="SD")
+
+count_sd_fig<-ggplot(gcount_sd,aes(RecYear, count_m,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=c_low,
+                    ymax=c_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper SD"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+gcount_cv<-interactionMeans(g_spat_c_cv)%>%
+  mutate(count_m=(`adjusted mean`),
+         c_up=(`adjusted mean`+`SE of link`),
+         c_low=(`adjusted mean`-`SE of link`),
+         variab="CV")
+
+count_cv_fig<-ggplot(gcount_cv,aes(RecYear, count_m,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=c_low,
+                    ymax=c_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper CV"))+
+  xlab(label=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+###combine figures####
+count_mean_fig+count_sd_fig+count_cv_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+###average figures####
+#wrangle data
+combo_spat_gcount<-gcount_mean%>%
+  bind_rows(gcount_sd,gcount_cv)%>%
+  group_by(FireGrzTrt, variab)%>%
+  summarise(gcount_avg=mean(count_m, na.rm=T),
+            c_se=SE_function(count_m))
+#visual
+g_avg_spat_viz<-ggplot(combo_spat_gcount[combo_spat_gcount$variab=="AVG",],aes(FireGrzTrt, gcount_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=gcount_avg-c_se,
+                    ymax=gcount_avg+c_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper abundance"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+g_sd_spat_viz<-ggplot(combo_spat_gcount[combo_spat_gcount$variab=="SD",],aes(FireGrzTrt, gcount_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=gcount_avg-c_se,
+                    ymax=gcount_avg+c_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper SD"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+g_cv_spat_viz<-ggplot(combo_spat_gcount[combo_spat_gcount$variab=="CV",],aes(FireGrzTrt, gcount_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=gcount_avg-c_se,
+                    ymax=gcount_avg+c_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper CV"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+###combine####
+g_t_fire_c_avg_fig+g_sd_spat_viz+g_cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
+#G composition#####
+#merging key with dataset and removing katydid, etc
+grassh_comm_df <- grasshopperspcomp_df%>%
+  left_join(watershed_key, by = "Watershed")%>%
+  mutate(RecYear = Recyear)%>%
+  filter(!Species%in%c("Oecanthinae spp.","Tettigoniidae spp.","Gryllidae spp.",
+                       "Conocephalus spp.","Neoconocephalus robustus","Scudderia texensis",
+                       "Arethaea constricta","Orchelimum spp.","Amblycorypha oblongifolia","Pediodectes haldemani",
+                       "Amblycorypha rotundifolia","Neoconocephalus spp.","Neoconocephalus ensiger","Pediodectes nigromarginatus",
+                       "Scudderia furcata","Scudderia spp."))%>%
+  #using the max count from the two diff survey done on each transect
+  group_by(Unit,RecYear,FireGrzTrt,Watershed,Repsite,Species)%>%
+  summarise(Total=max(Total))
