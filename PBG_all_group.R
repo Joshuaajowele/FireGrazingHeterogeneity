@@ -1,6 +1,6 @@
 #Author: Joshua Ajowele####
 #This script is for plant biomass and species composition response to fire and grazing heterogeneity
-#Date: Feb 6, 2026 Last modified: March 8, 2026
+#Date: Feb 6, 2026 Last modified: March 11, 2026
 
 #Load library####
 library(tidyverse)
@@ -55,6 +55,8 @@ lifeforms_data<- read_excel("Data_PBG_species/sp_list_update.xlsx")%>%
 #import grasshopper data
 grasshopperspcomp_df_raw <- read.csv("Data_PBG_species/PBG073.csv")%>%
   filter(Recyear%in%2013:2023)
+#grasshopper feeding guild
+feeding_df<-read_excel("Data_PBG_species/Grasshopper_guild.xlsx")
 #BIOMASS####
 ##modify data####
 biomass_reg <- biomass_diskpasture%>%
@@ -1600,6 +1602,250 @@ g_evar_past_fig<-ggplot(g_even_past_viz,aes(FireGrzTrt, Even,col=FireGrzTrt))+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Grasshopper evenness"))+
   xlab(label="Fire & grazing treatment")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+####betadiversity####
+g_comp_wide<-grassh_tcomm_df%>%
+  mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  filter(Repsite!="C" | Watershed!="C03C")%>%
+  filter(Watershed!="C03C" | Repsite!="D")%>%
+  filter(Watershed!="C03B" | Repsite!="A")%>%
+  filter(Watershed!="C03B" | Repsite!="B")%>%
+  filter(Watershed!="C03B" | Repsite!="C")%>%
+  filter(Watershed!="C03A" | Repsite!="A")%>%
+  filter(Watershed!="C03A" | Repsite!="B")%>%
+  filter(Watershed!="C03A" | Repsite!="C")%>%
+  filter(Watershed!="C3SC" | Repsite!="A")%>%
+  filter(Watershed!="C3SC" | Repsite!="B")%>%
+  filter(Watershed!="C3SC" | Repsite!="C")%>%
+  filter(Watershed!="C3SA" | Repsite!="B")%>%
+  filter(Watershed!="C3SA" | Repsite!="C")%>%
+  filter(Watershed!="C3SA" | Repsite!="D")%>%
+  filter(Watershed!="C3SB" | Repsite!="A")%>%
+  filter(Watershed!="C3SB" | Repsite!="B")%>%
+  ungroup()%>%
+  select(-total_count:-year_watershed)%>%
+  distinct()%>%
+  mutate(unit_trt=paste(Unit, FireGrzTrt, sep="_"))%>%
+  pivot_wider(names_from = Species, values_from = gcount, values_fill = 0)
+
+# Separate pcomp and environmental columns
+g_sp_data <- g_comp_wide %>%
+  ungroup()%>%
+  dplyr::select(-1:-7)
+g_env_data <- g_comp_wide%>%dplyr::select(1:7)
+#calculating betadiversity by unit
+#####loop;creating a loop to do this####
+year_vec_g <- unique(g_env_data$RecYear)
+g_perm_unit <- {}
+g_beta_unit <- {}
+
+
+for(YEAR in 1:length(year_vec_g)){
+  vdist_temp_g_unit <- vegdist(filter(g_sp_data, g_env_data$RecYear ==  year_vec_g[YEAR]))
+  bdisp_temp_g_unit <- betadisper(vdist_temp_g_unit, filter(g_env_data, RecYear==year_vec_g[YEAR])$unit_trt, type = "centroid")
+  bdisp_out_temp_g_unit <- data.frame(filter(g_env_data, RecYear==year_vec_g[YEAR]), distance = bdisp_temp_g_unit$distances)
+  g_beta_unit <- rbind(g_beta_unit, bdisp_out_temp_g_unit)
+  
+  rm(vdist_temp_g_unit, bdisp_temp_g_unit, bdisp_out_temp_g_unit)
+}
+#write.csv(g_beta_unit, "Data_PBG_species/g_beta_sep_unit.csv")
+#####analysis####
+g_beta_unit$FireGrzTrt=as.factor(g_beta_unit$FireGrzTrt)
+g_beta_unit$Unit=as.factor(g_beta_unit$Unit)
+g_beta_unit$RecYear=as.factor(g_beta_unit$RecYear)
+g_beta_m<-lmer(log(distance)~FireGrzTrt*RecYear+(1|Unit), data=g_beta_unit)
+check_model(g_beta_m)
+anova(g_beta_m)
+testInteractions(g_beta_m, pairwise = "FireGrzTrt")
+#####visual####
+g_beta_viz<-interactionMeans(g_beta_m)%>%
+  mutate(beta =exp(`adjusted mean`),
+         b_up=exp(`adjusted mean`+`SE of link`),
+         b_low=exp(`adjusted mean`-`SE of link`))
+g_beta_fig<-ggplot(g_beta_viz,aes(RecYear, beta,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=b_low,
+                    ymax=b_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper betadiversity"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#summarize across years
+g_beta_viz_avg<-g_beta_viz%>%
+  group_by(FireGrzTrt)%>%
+  summarise(beta_avg=mean(beta, na.rm=T),
+            b_upp=mean(b_up, na.rm=T),
+            b_lower=mean(b_low, na.rm=T))
+g_beta_avg_fig<-ggplot(g_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=b_lower,
+                    ymax=b_upp),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper betadiversity"))+
+  xlab(label=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+
+g_t_fire_comp_s<-grassh_tcomm_df%>%
+  mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  filter(Unit=="south")%>%
+  ungroup()%>%
+  select(-gcount, -total_count, -rep_id,-wsd_rep,-year_watershed)%>%
+  distinct()%>%
+  pivot_wider(names_from = Species, values_from = rel_abund, values_fill = 0)
+g_t_fire_comp_n<-grassh_tcomm_df%>%
+  mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  filter(Unit=="north")%>%
+  ungroup()%>%
+  select(-gcount, -total_count, -rep_id,-wsd_rep,-year_watershed)%>%
+  distinct()%>%
+  pivot_wider(names_from = Species, values_from = rel_abund, values_fill = 0)
+#split environmental and species data
+#south
+g_burn_time_sp_data_s <- g_t_fire_comp_s %>%
+  ungroup()%>%
+  dplyr::select(-1:-6)
+g_burn_time_env_data_s <- g_t_fire_comp_s%>%dplyr::select(1:6)
+#north
+g_burn_time_sp_data_n <- g_t_fire_comp_n %>%
+  ungroup()%>%
+  dplyr::select(-1:-6)
+g_burn_time_env_data_n <- g_t_fire_comp_n%>%dplyr::select(1:6)
+
+#get nmds1 and 2
+g_burn_time_mds_s <- metaMDS(g_burn_time_sp_data_s, distance = "bray",k=2) 
+g_burn_time_mds_n <- metaMDS(g_burn_time_sp_data_n, distance = "bray",k=2) 
+#combine NMDS1 and 2 with factor columns and create centroids
+g_burn_time_mds_scores_s <- data.frame(g_burn_time_env_data_s, scores(g_burn_time_mds_s, display="sites"))%>%
+  group_by(RecYear, Unit,time_fire,Watershed)%>%
+  mutate(NMDS1_mean=mean(NMDS1),
+         NMDS2_mean=mean(NMDS2))
+g_burn_time_mds_scores_n <- data.frame(g_burn_time_env_data_n, scores(g_burn_time_mds_n, display="sites"))%>%
+  group_by(RecYear, Unit,time_fire,Watershed)%>%
+  mutate(NMDS1_mean=mean(NMDS1),
+         NMDS2_mean=mean(NMDS2))
+
+#####visual-plotting centroid through time####
+g_t_s<-ggplot(g_burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
+  geom_point(size=8, stroke=2)+
+  scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
+  scale_shape_manual(values=c(21:24))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+g_t_n<-ggplot(g_burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
+  geom_point(size=8, stroke=2)+
+  scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
+  scale_shape_manual(values=c(21:24))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+#####stat #####
+#compare by timesince fire include watershed and year
+g_dist_south<-vegdist(g_burn_time_sp_data_s)
+g_dist_north<-vegdist(g_burn_time_sp_data_n)
+g_permanova_south<-adonis2(g_dist_south~g_burn_time_env_data_s$time_fire+g_burn_time_env_data_s$Watershed+as.factor(g_burn_time_env_data_s$RecYear), by="terms")
+g_permanova_south
+#multiple comparisons
+g_pairwise_south<-pairwise.adonis2(g_dist_south~time_fire+Watershed+as.factor(RecYear),by="terms", data=g_burn_time_env_data_s)
+
+#comparing time since fire within each watershed to validate
+g_wat_south<-vegdist(g_burn_time_sp_data_s[g_burn_time_env_data_s$Watershed=="C03C",])
+adonis2(g_wat_south~time_fire+as.factor(RecYear), by="terms", data=g_burn_time_env_data_s[g_burn_time_env_data_s$Watershed=="C03C",])
+g_wat_south<-vegdist(g_burn_time_sp_data_s[g_burn_time_env_data_s$Watershed=="C03A",])
+adonis2(g_wat_south~time_fire+as.factor(RecYear), by="terms", data=g_burn_time_env_data_s[g_burn_time_env_data_s$Watershed=="C03A",])
+g_wat_south<-vegdist(g_burn_time_sp_data_s[g_burn_time_env_data_s$Watershed=="C03B",])
+adonis2(g_wat_south~time_fire+as.factor(RecYear), by="terms", data=g_burn_time_env_data_s[g_burn_time_env_data_s$Watershed=="C03B",])
+
+g_permanova_north<-adonis2(g_dist_north~g_burn_time_env_data_n$time_fire+g_burn_time_env_data_n$Watershed+as.factor(g_burn_time_env_data_n$RecYear), by="terms")
+g_permanova_north
+#multiple comparisons
+pairwise.adonis2(g_dist_north~time_fire+Watershed+as.factor(RecYear),by="terms", data=g_burn_time_env_data_n)
+g_wat_north<-vegdist(g_burn_time_sp_data_n[g_burn_time_env_data_n$Watershed=="C3SA",])
+adonis2(g_wat_north~time_fire+as.factor(RecYear), by="terms", data=g_burn_time_env_data_n[g_burn_time_env_data_n$Watershed=="C3SA",])
+g_wat_north<-vegdist(g_burn_time_sp_data_n[g_burn_time_env_data_n$Watershed=="C3SB",])
+adonis2(g_wat_north~time_fire+as.factor(RecYear), by="terms", data=g_burn_time_env_data_n[g_burn_time_env_data_n$Watershed=="C3SB",])
+g_wat_north<-vegdist(g_burn_time_sp_data_n[g_burn_time_env_data_n$Watershed=="C3SC",])
+adonis2(g_wat_north~time_fire+as.factor(RecYear), by="terms", data=g_burn_time_env_data_n[g_burn_time_env_data_n$Watershed=="C3SC",])
+
+####lifeform####
+#wrangle data
+g_comp_past_life<-g_comp_wide%>%
+  pivot_longer(8:60, names_to = "Species", values_to = "abundance")%>%
+  group_by(Unit,RecYear,FireGrzTrt,Species)%>%
+  summarise(abundance=mean(abundance, na.rm=T))%>%
+  left_join(feeding_df, by="Species")%>%
+  #removing unknown
+  filter(feeding!="unknown")
+g_comp_life<-g_comp_past_life%>%
+  group_by(Unit,RecYear,FireGrzTrt,feeding)%>%
+  summarise(abund=sum(abundance))%>%
+  group_by(Unit,RecYear,FireGrzTrt)%>%
+  mutate(t_abund=sum(abund),
+         rel_abund=abund/t_abund)
+g_comp_life$Unit<-as.factor(g_comp_life$Unit)
+g_comp_life$RecYear<-as.factor(g_comp_life$RecYear)
+g_comp_life$FireGrzTrt<-as.factor(g_comp_life$FireGrzTrt)
+#####analysis####
+#perennial grass
+gh_grass<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=g_comp_life[g_comp_life$feeding=="grass",])
+check_model(gh_grass)
+anova(gh_grass)
+testInteractions(gh_grass,pairwise="FireGrzTrt")
+gh_grass_data<-interactionMeans(gh_grass)%>%
+  mutate(group="Grass feeders")
+#annual grass
+gh_forb<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=g_comp_life[g_comp_life$feeding=="forb",])
+check_model(gh_forb)
+anova(gh_forb)
+testInteractions(gh_forb,pairwise="FireGrzTrt",fixed="RecYear")
+gh_forb_data<-interactionMeans(gh_forb)%>%
+  mutate(group="Forb feeders")
+
+#perennial forbish
+gh_mix<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=g_comp_life[g_comp_life$feeding=="mix",])
+check_model(gh_mix)
+anova(gh_mix)
+gh_mix_data<-interactionMeans(gh_mix)%>%
+  mutate(group="Mix feeders")
+
+#####visual####
+g_group_data<-gh_mix_data%>%
+  bind_rows(gh_grass_data,gh_forb_data)%>%
+  mutate(grp_mean=`adjusted mean`,
+           upper=(`adjusted mean`+`SE of link`),
+         lower=(`adjusted mean`-`SE of link`))
+#explore
+# ggplot(g_comp_life[g_comp_life$feeding=="mix",],aes(RecYear, rel_abund, fill=FireGrzTrt))+
+#   geom_boxplot()
+g_grp_data_ready<-g_group_data%>%
+  group_by(group, FireGrzTrt)%>%
+  summarise(grp_m=mean(grp_mean, na.rm=T),
+            grp_upper=mean(upper, na.rm=T),
+            grp_lower=mean(lower, na.rm=T))
+g_group<-ggplot(g_grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=grp_lower,
+                    ymax=grp_upper),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Relative cover")+
+  xlab(label="Grasshopper group")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
