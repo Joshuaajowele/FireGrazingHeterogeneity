@@ -57,6 +57,14 @@ grasshopperspcomp_df_raw <- read.csv("Data_PBG_species/PBG073.csv")%>%
   filter(Recyear%in%2013:2023)
 #grasshopper feeding guild
 feeding_df<-read_excel("Data_PBG_species/Grasshopper_guild.xlsx")
+#Bird data
+PBG_bird_data_raw<-read_excel("Data_PBG_species/Qy_ExportPBGSurveyData_Mar2023.xlsx")
+PBG_bird_C1A<-read_excel("Data_PBG_species/Qy_ExportPBGSurveyData_C1A_Apr2023.xlsx")%>%
+  filter(Year%in%2011:2021)
+PBG_bird_updated<-read_excel("Data_PBG_species/Qy_ExportPBGSurveyData_Feb2026.xlsx")
+unique(PBG_bird_C1A$Year)
+#2019 data is missing for C1A-talk to Alice
+PBG_bird_class<-read_excel("Data_PBG_species/KNZSpecies.xlsx")
 #BIOMASS####
 ##modify data####
 biomass_reg <- biomass_diskpasture%>%
@@ -1850,3 +1858,423 @@ g_group<-ggplot(g_grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
+
+#BIRD####
+##data wrangling####
+
+
+#merge data
+PBG_bird_merge<-PBG_bird_data_raw%>%
+  rename(SpeciesCode=AOUCODE)%>%
+  full_join(PBG_bird_C1A, by=c("Year","TransectName","Duration","Date","Observer","StartTime",
+                               "Watershed", "DistanceFromLine_Old","SpeciesCode","Count","SEX",
+                               "ObsLocation","Notes","Angle","AngularDistance"))%>%
+  full_join(PBG_bird_updated, by=c("Year","TransectName","Duration","Date","Observer","StartTime",
+                               "Watershed", "DistanceFromLine_Old","SpeciesCode","Count","SEX",
+                               "ObsLocation","Notes","Angle","AngularDistance"))%>%
+  filter(Year%in%2013:2023)%>%
+  filter(Watershed!="C3SC")%>%
+  filter(Watershed!="C3SB")%>%
+  filter(Watershed!="C3SA")
+unique(PBG_bird_merge$Watershed)
+#Create a watershed key column to merge with the raw data
+watershed_bird_key <- data.frame(Watershed = levels(factor(PBG_bird_merge$Watershed)),# create key to merge with raw data
+                                 FireGrzTrt=c("ABG", "PBG", "PBG", "PBG"))
+#need to create transect key for easier statistical analysis
+transect_key<- data.frame(TransectName = levels(factor(PBG_bird_merge$TransectName)),# create key to merge with raw data
+                          Transect=c("A","B","A","B","A","B","A","B"))
+#merge key
+PBG_bird_viz<-PBG_bird_merge%>%
+  left_join(watershed_bird_key, by="Watershed")%>%
+  left_join(transect_key, by="TransectName")
+#check data for entry errors, 2018 C3A seems to be suspect: 
+#I think it has an extra transect that should belong to C3B-90% sure-Corrected in raw data
+#email Alice about it
+
+#There are multiple observation by multiple observers 2011-2016
+#or just multiple observation by one observer 2011, C3C, C1A
+#solutions:group by time, species and take max count, regardless of observer
+check_data<-PBG_bird_viz%>%
+  filter(Year==2018)%>%
+  filter(Watershed=="C3A")
+#check unique species code name
+codes_name<-data.frame(unique(PBG_bird_viz$SpeciesCode))
+#convert to uppercase
+PBG_bird_viz$SpeciesCode<-toupper(PBG_bird_viz$SpeciesCode)
+
+#data ready for visuals
+PBG_bird_viz_ready_all<-PBG_bird_viz%>%
+  rename(total=Count)%>%
+  #remove NA otherwise it will appear in max count
+  filter(total!="NA")%>%
+  #sum diff sex of the same species
+  group_by(Year, FireGrzTrt, Watershed, TransectName, Transect, SpeciesCode, Date, Observer)%>%
+  summarise(total=sum(total))%>%
+  group_by(Year, FireGrzTrt, Watershed, TransectName, Transect, SpeciesCode)%>%
+  summarise(total_max=max(total))%>%
+  filter(Year!=2019)%>%#removing 2019 because it is missing for C1A
+  #rename watershed for ease
+  mutate(Watershed=case_when(Watershed=="C1A"~"C01A",
+                             Watershed=="C3A"~"C03A",
+                             Watershed=="C3B"~"C03B",
+                             Watershed=="C3C"~"C03C"))
+##Temporal analysis at the local/transect scale####
+#prepare data
+b_temp_countdata<-PBG_bird_viz_ready_all%>%
+  group_by(Year,Watershed, FireGrzTrt, Transect)%>%
+  summarise(Tcount=sum(total_max, na.rm=T))%>%
+  group_by(Watershed, FireGrzTrt, Transect)%>%
+  summarise(temp_count=mean(Tcount, na.rm=T),
+            temp_count_sd=sd(Tcount),
+            temp_count_cv=temp_count_sd/temp_count)
+#convert charcter to factors
+b_temp_countdata$Watershed=as.factor(b_temp_countdata$Watershed)  
+b_temp_countdata$FireGrzTrt=as.factor(b_temp_countdata$FireGrzTrt)
+#start analysis
+#temporal mean
+b_temp_mean_m<-lmer(temp_count~FireGrzTrt+(1|Watershed), data=b_temp_countdata)
+check_model(b_temp_mean_m)
+anova(b_temp_mean_m)
+#temporal variability
+b_temp_sd_m<-lmer(temp_count_sd~FireGrzTrt+(1|Watershed), data=b_temp_countdata)
+check_model(b_temp_sd_m)
+anova(b_temp_sd_m)
+
+b_temp_cv_m<-lmer(temp_count_cv~FireGrzTrt+(1|Watershed), data=b_temp_countdata)
+check_model(b_temp_cv_m)
+check_normality(b_temp_cv_m)
+anova(b_temp_cv_m)
+
+##visuals####
+b_TBM<-interactionMeans(b_temp_mean_m)%>%
+  mutate(resp="count_mean")
+b_TBSD<-interactionMeans(b_temp_sd_m)%>%
+  mutate(resp="count_sd")
+b_TBCV<-interactionMeans(b_temp_cv_m)%>%
+  mutate(resp="count_cv")
+b_temp_count_vizdata<-b_TBM%>%
+  bind_rows(b_TBSD,b_TBCV)%>%
+  mutate(avg=`adjusted mean`,
+         up=`adjusted mean`+`SE of link`,
+         low=`adjusted mean`-`SE of link`)
+
+b_TBM_viz<-ggplot(b_temp_count_vizdata[b_temp_count_vizdata$resp=="count_mean",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Bird abundance"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+b_TBSD_viz<-ggplot(b_temp_count_vizdata[b_temp_count_vizdata$resp=="count_sd",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Bird SD"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+b_TBCV_viz<-ggplot(b_temp_count_vizdata[b_temp_count_vizdata$resp=="count_cv",],aes(FireGrzTrt, avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Bird CV"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+###combine figures####
+b_TBM_viz+b_TBSD_viz+b_TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
+##Spatial variability at pasture scale####
+b_count_tfire<-PBG_bird_viz_ready_all%>%
+  group_by(Year,Watershed, FireGrzTrt, Transect)%>%
+  summarise(Tcount=sum(total_max, na.rm=T))%>%
+  mutate(year_watershed=paste(Year, Watershed, sep="_"))%>%
+  left_join(YrSinceFire_key, by="year_watershed")
+
+###time_fire analysis to show differences in PBG patches####
+b_count_tfire$Year=as.factor(b_count_tfire$Year)
+b_count_tfire$time_fire=as.factor(b_count_tfire$time_fire)
+b_count_tfire$Watershed=as.factor(b_count_tfire$Watershed)
+#model
+b_t_count_m<-lmer(log(Tcount)~time_fire*Year+(1|Watershed), data=b_count_tfire)
+check_model(b_t_count_m)
+anova(b_t_count_m)
+testInteractions(b_t_count_m,pairwise = "time_fire", fixed="Year")
+testInteractions(b_t_count_m,pairwise = "time_fire")
+
+b_t_count_mean<-interactionMeans(b_t_count_m)%>%
+  mutate(count_m=exp(`adjusted mean`),
+         count_up=exp(`adjusted mean`+`SE of link`),
+         count_low=exp(`adjusted mean`-`SE of link`))
+
+b_t_fire_count_fig<-ggplot(b_t_count_mean,aes(Year, count_m,col=time_fire))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(Year)))+
+  geom_errorbar(aes(ymin=count_low,
+                    ymax=count_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
+  ylab(label=expression("Bird abundance"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+b_t_c_mean_avg<-b_t_count_mean%>%
+  group_by(time_fire)%>%
+  summarise(count_avg=mean(count_m, na.rm=T),
+            count_se=SE_function(count_m))
+
+b_t_fire_c_avg_fig<-ggplot(b_t_c_mean_avg,aes(time_fire, count_avg,col=time_fire))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=count_avg-count_se,
+                    ymax=count_avg+count_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
+  ylab(label=expression("Bird abundance"))+
+  xlab(label="Year since last fire")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+#wrangle data
+b_spat_cdata<-b_count_tfire%>%
+  group_by(Year, FireGrzTrt)%>%
+  summarise(spat_c=mean(Tcount, na.rm=T),
+            spat_c_sd=sd(Tcount),
+            spat_c_cv=spat_c_sd/spat_c)
+#convert character to factors
+b_spat_cdata$FireGrzTrt=as.factor(b_spat_cdata$FireGrzTrt)
+b_spat_cdata$Year=as.factor(b_spat_cdata$Year)
+#analysis
+b_spat_c_m<-lm(log(spat_c)~FireGrzTrt+Year, data=b_spat_cdata)
+check_model(b_spat_c_m)
+anova(b_spat_c_m)
+testInteractions(b_spat_c_m, pairwise = "FireGrzTrt")
+#SD
+b_spat_c_sd<-lm(spat_c_sd~FireGrzTrt+Year, data=b_spat_cdata)
+check_model(b_spat_c_sd)
+anova(b_spat_c_sd)
+#cv
+b_spat_c_cv<-lm(spat_c_cv~FireGrzTrt+Year, data=b_spat_cdata)
+check_model(b_spat_c_cv)
+anova(b_spat_c_cv)
+testInteractions(b_spat_c_cv,pairwise = "FireGrzTrt")
+##visuals####
+bcount_mean<-interactionMeans(b_spat_c_m)%>%
+  mutate(count_m=exp(`adjusted mean`),
+         c_up=exp(`adjusted mean`+`std. error`),
+         c_low=exp(`adjusted mean`-`std. error`),
+         variab="AVG")
+
+bcount_sd<-interactionMeans(b_spat_c_sd)%>%
+  mutate(count_m=(`adjusted mean`),
+         c_up=(`adjusted mean`+`std. error`),
+         c_low=(`adjusted mean`+`std. error`),
+         variab="SD")
+
+bcount_cv<-interactionMeans(b_spat_c_cv)%>%
+  mutate(count_m=(`adjusted mean`),
+         c_up=(`adjusted mean`+`std. error`),
+         c_low=(`adjusted mean`+`std. error`),
+         variab="CV")
+###average figures####
+#wrangle data
+combo_spat_bcount<-bcount_mean%>%
+  bind_rows(bcount_sd,bcount_cv)%>%
+  group_by(FireGrzTrt, variab)%>%
+  summarise(bcount_avg=mean(count_m, na.rm=T),
+            c_se=SE_function(count_m))
+#visual
+b_avg_spat_viz<-ggplot(combo_spat_bcount[combo_spat_bcount$variab=="AVG",],aes(FireGrzTrt, bcount_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=bcount_avg-c_se,
+                    ymax=bcount_avg+c_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Bird abundance"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+b_sd_spat_viz<-ggplot(combo_spat_bcount[combo_spat_bcount$variab=="SD",],aes(FireGrzTrt, bcount_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=bcount_avg-c_se,
+                    ymax=bcount_avg+c_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Bird SD"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+b_cv_spat_viz<-ggplot(combo_spat_bcount[combo_spat_bcount$variab=="CV",],aes(FireGrzTrt, bcount_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=bcount_avg-c_se,
+                    ymax=bcount_avg+c_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Bird CV"))+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+###combine####
+b_t_fire_c_avg_fig+b_sd_spat_viz+b_cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
+#Bird composition#####
+b_tcomm_df<-PBG_bird_viz_ready_all%>%
+  group_by(FireGrzTrt,Watershed, Year,Transect)%>%
+  mutate(total_count=sum(total_max))%>%
+  group_by(FireGrzTrt, Watershed, Year,Transect,SpeciesCode)%>%
+  mutate(rel_abund=total_max/total_count)%>%
+  mutate(rep_id=paste(Watershed, FireGrzTrt, Transect, sep="_"),
+         wsd_rep=paste(Watershed,Transect, sep="_"))
+##community change calculation yearly in each transect####
+b_time_change<-multivariate_change(b_tcomm_df, species.var="SpeciesCode",
+                                   abundance.var = "rel_abund",
+                                   replicate.var="rep_id",
+                                   time.var = "Year",
+                                   treatment.var="wsd_rep")
+
+#combine to have datatset with tretament variables for analysis
+b_t_change<-b_tcomm_df%>%
+  ungroup()%>%
+  select(Watershed, Transect, FireGrzTrt, wsd_rep)%>%
+  distinct()%>%
+  left_join(b_time_change, by="wsd_rep")%>%
+  mutate(year_diff=paste(Year, Year2, sep="_"))
+
+b_t_change$FireGrzTrt<-as.factor(b_t_change$FireGrzTrt)
+b_t_change$Watershed<-as.factor(b_t_change$Watershed)
+b_t_change$year_diff<-as.factor(b_t_change$year_diff)
+
+##model for analysis####
+b_t_ch_m<-lmer(composition_change~FireGrzTrt*year_diff+(1|Watershed), data=b_t_change)
+check_model(b_t_ch_m)
+anova(b_t_ch_m)
+
+##visuals####
+#wrangle data from model
+b_comp_change_mean<-interactionMeans(b_t_ch_m)%>%
+  mutate(comp_chang=(`adjusted mean`),
+         chang_up=(`adjusted mean`+`SE of link`),
+         chang_low=(`adjusted mean`-`SE of link`))
+
+b_chang_mean_fig<-ggplot(b_comp_change_mean,aes(year_diff, comp_chang,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(year_diff)))+
+  geom_errorbar(aes(ymin=chang_low,
+                    ymax=chang_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Bird composition change"))+
+  xlab(label="Year comparison")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#calculate average 
+b_chang_avg<-b_comp_change_mean%>%
+  group_by(FireGrzTrt)%>%
+  summarise(comp_chang_avg=mean(comp_chang, na.rm=T),
+            c_chang_se=SE_function(comp_chang))
+#visual
+b_avg_chang_viz<-ggplot(b_chang_avg,aes(FireGrzTrt, comp_chang_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=comp_chang_avg-c_chang_se,
+                    ymax=comp_chang_avg+c_chang_se),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Bird composition change")+
+  xlab(labe=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+##Spatial bird comp####
+###transect scale diversity####
+b_rich_trsct <- community_structure(b_tcomm_df, time.var = "Year", 
+                                    abundance.var = "rel_abund",
+                                    replicate.var = "rep_id", metric = "Evar")
+#combine with treatmnet info
+b_rich_trsct<-b_tcomm_df%>%
+  ungroup()%>%
+  select(Year, Watershed, Transect, FireGrzTrt, rep_id)%>%
+  distinct()%>%
+  left_join(b_rich_trsct, by=c("Year","rep_id"))
+
+####analysis####
+#convert to factors for analysis
+b_rich_trsct$Year<-as.factor(b_rich_trsct$Year)
+b_rich_trsct$Watershed<-as.factor(b_rich_trsct$Watershed)
+b_rich_trsct$FireGrzTrt<-as.factor(b_rich_trsct$FireGrzTrt)
+
+b_rich_trsct_m<-lmer(richness~FireGrzTrt*Year+(1|Watershed), data=b_rich_trsct)
+check_model(b_rich_trsct_m)
+anova(b_rich_trsct_m)
+
+
+b_even_trsct_m<-lmer(Evar~FireGrzTrt*Year+(1|Watershed), data=b_rich_trsct)
+check_model(b_even_trsct_m)
+anova(b_even_trsct_m)
+testInteractions(g_even_trsct_m, pairwise = "FireGrzTrt")
+
+#####visuals#####
+#wrangle data from model
+b_rich_t<-interactionMeans(b_rich_trsct_m)%>%
+  mutate(rich =`adjusted mean`,
+         r_up=`adjusted mean`+`SE of link`,
+         r_low=`adjusted mean`-`SE of link`)
+
+b_rich_trsct_fig<-ggplot(b_rich_t,aes(Year, rich,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(Year)))+
+  geom_errorbar(aes(ymin=r_low,
+                    ymax=r_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Bird richness"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+####time_fire transect####
+b_tcomm_df$Year<-as.factor(b_tcomm_df$Year)
+b_rich_t_fire_tst<-b_tcomm_df%>%
+  ungroup()%>%
+  mutate(year_watershed=paste(Year, Watershed, sep="_"))%>%
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  select(Year,Watershed, Transect, time_fire, rep_id)%>%
+  distinct()%>%
+  left_join(b_rich_trsct, by=c("Year","rep_id","Watershed","Transect"))
+
+####analysis####
+#convert to factors for analysis
+b_rich_t_fire_tst$Watershed<-as.factor(b_rich_t_fire_tst$Watershed)
+b_rich_t_fire_tst$time_fire<-as.factor(b_rich_t_fire_tst$time_fire)
+
+b_rich_t_fire_tst_m<-lmer(richness~time_fire*Year+(1|Watershed), data=b_rich_t_fire_tst)
+check_model(b_rich_t_fire_tst_m)
+anova(b_rich_t_fire_tst_m)
+testInteractions(g_rich_t_fire_tst_m, pairwise="time_fire", fixed="RecYear")
+testInteractions(b_rich_t_fire_tst_m, pairwise="time_fire")
+
+b_even_t_fire_tst_m<-lmer(Evar~time_fire*Year+(1|Watershed), data=b_rich_t_fire_tst)
+check_model(b_even_t_fire_tst_m)
+anova(b_even_t_fire_tst_m)
+ggplot(b_rich_t_fire_tst, aes(Year, richness, col=time_fire))+
+  geom_boxplot()
+ggplot(b_rich_t_fire_tst, aes(Year, Evar, col=time_fire))+
+  geom_boxplot()
