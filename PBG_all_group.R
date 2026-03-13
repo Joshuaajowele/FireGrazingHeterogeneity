@@ -1704,7 +1704,7 @@ g_beta_avg_fig<-ggplot(g_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt))+
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 
-
+####G NMDS####
 g_t_fire_comp_s<-grassh_tcomm_df%>%
   mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
   left_join(YrSinceFire_key, by="year_watershed")%>%
@@ -1907,7 +1907,7 @@ PBG_bird_viz_ready_all<-PBG_bird_viz%>%
   rename(total=Count)%>%
   #remove NA otherwise it will appear in max count
   filter(total!="NA")%>%
-  #sum diff sex of the same species
+  #add up each species regardless of sex
   group_by(Year, FireGrzTrt, Watershed, TransectName, Transect, SpeciesCode, Date, Observer)%>%
   summarise(total=sum(total))%>%
   group_by(Year, FireGrzTrt, Watershed, TransectName, Transect, SpeciesCode)%>%
@@ -2278,3 +2278,102 @@ ggplot(b_rich_t_fire_tst, aes(Year, richness, col=time_fire))+
   geom_boxplot()
 ggplot(b_rich_t_fire_tst, aes(Year, Evar, col=time_fire))+
   geom_boxplot()
+
+###Bird NMDS####
+b_t_fire_comp<-b_tcomm_df%>%
+  mutate(year_watershed=paste(Year, Watershed, sep="_"))%>%
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  ungroup()%>%
+  select(-total_max, -total_count, -rep_id,-wsd_rep,-year_watershed)%>%
+  distinct()%>%
+  pivot_wider(names_from = SpeciesCode, values_from = rel_abund, values_fill = 0)
+#split environmental and species data
+b_burn_time_sp_data <- b_t_fire_comp %>%
+  ungroup()%>%
+  dplyr::select(-1:-6)
+b_burn_time_env_data <- b_t_fire_comp%>%dplyr::select(1:6)
+
+#get nmds1 and 2
+b_burn_time_mds <- metaMDS(b_burn_time_sp_data, distance = "bray",k=2) 
+
+#combine NMDS1 and 2 with factor columns and create centroids
+b_burn_time_mds_scores<- data.frame(b_burn_time_env_data, scores(b_burn_time_mds, display="sites"))%>%
+  group_by(Year,time_fire,Watershed)%>%
+  mutate(NMDS1_mean=mean(NMDS1),
+         NMDS2_mean=mean(NMDS2))
+
+#####visual-plotting centroid through time####
+b_t_s<-ggplot(b_burn_time_mds_scores, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
+  geom_point(size=8, stroke=2)+
+  scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
+  scale_shape_manual(values=c(21:24))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+#compare by timesince fire include watershed and year
+b_dist<-vegdist(b_burn_time_sp_data)
+b_permanova<-adonis2(b_dist~b_burn_time_env_data$time_fire+b_burn_time_env_data$Watershed+as.factor(b_burn_time_env_data$Year), by="terms")
+b_permanova
+#multiple comparisons
+b_pairwise<-pairwise.adonis2(b_dist~time_fire+Watershed+as.factor(Year),by="terms", data=b_burn_time_env_data)
+
+#####loop;creating a loop to do this####
+#wont work cause two point/transect for ABG
+year_vec_b <- unique(b_burn_time_env_data$Year)
+b_beta_unit <- {}
+
+
+for(YEAR in 1:length(year_vec_b)){
+  vdist_temp_b_unit <- vegdist(filter(b_burn_time_sp_data, b_burn_time_env_data$Year ==  year_vec_b[YEAR]))
+  bdisp_temp_b_unit <- betadisper(vdist_temp_b_unit, filter(b_burn_time_env_data, Year==year_vec_b[YEAR])$FireGrzTrt, type = "centroid")
+  bdisp_out_temp_b_unit <- data.frame(filter(b_burn_time_env_data, Year==year_vec_b[YEAR]), distance = bdisp_temp_b_unit$distances)
+  b_beta_unit <- rbind(b_beta_unit, bdisp_out_temp_b_unit)
+  
+  rm(vdist_temp_b_unit, bdisp_temp_b_unit, bdisp_out_temp_b_unit)
+}
+#write.csv(g_beta_unit, "Data_PBG_species/g_beta_sep_unit.csv")
+#####analysis####
+b_beta_unit$FireGrzTrt=as.factor(b_beta_unit$FireGrzTrt)
+b_beta_unit$Year=as.factor(b_beta_unit$Year)
+b_beta_m<-lmer(distance~FireGrzTrt*Year+(1|Watershed), data=b_beta_unit)
+b_beta_m<-lm(distance~FireGrzTrt*Year, data=b_beta_unit)
+check_model(b_beta_m)
+check_homogeneity(b_beta_m)
+anova(b_beta_m)
+
+#####visual####
+g_beta_viz<-interactionMeans(g_beta_m)%>%
+  mutate(beta =exp(`adjusted mean`),
+         b_up=exp(`adjusted mean`+`SE of link`),
+         b_low=exp(`adjusted mean`-`SE of link`))
+g_beta_fig<-ggplot(g_beta_viz,aes(RecYear, beta,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=b_low,
+                    ymax=b_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper betadiversity"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#summarize across years
+g_beta_viz_avg<-g_beta_viz%>%
+  group_by(FireGrzTrt)%>%
+  summarise(beta_avg=mean(beta, na.rm=T),
+            b_upp=mean(b_up, na.rm=T),
+            b_lower=mean(b_low, na.rm=T))
+g_beta_avg_fig<-ggplot(g_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=b_lower,
+                    ymax=b_upp),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Grasshopper betadiversity"))+
+  xlab(label=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
