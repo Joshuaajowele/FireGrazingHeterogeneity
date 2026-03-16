@@ -2007,7 +2007,7 @@ b_count_tfire$Year=as.factor(b_count_tfire$Year)
 b_count_tfire$time_fire=as.factor(b_count_tfire$time_fire)
 b_count_tfire$Watershed=as.factor(b_count_tfire$Watershed)
 #model
-b_t_count_m<-lmer(log(Tcount)~time_fire*Year+(1|Watershed), data=b_count_tfire)
+b_t_count_m<-lmer(log(Tcount)~time_fire+Year+(1|Watershed), data=b_count_tfire)#since spatial sd and cv below cannot produce interaction
 check_model(b_t_count_m)
 anova(b_t_count_m)
 testInteractions(b_t_count_m,pairwise = "time_fire", fixed="Year")
@@ -2057,9 +2057,10 @@ b_spat_cdata<-b_count_tfire%>%
 b_spat_cdata$FireGrzTrt=as.factor(b_spat_cdata$FireGrzTrt)
 b_spat_cdata$Year=as.factor(b_spat_cdata$Year)
 #analysis
-b_spat_c_m<-lm(log(spat_c)~FireGrzTrt+Year, data=b_spat_cdata)
+b_spat_c_m<-lm(log(spat_c)~FireGrzTrt+Year, data=b_spat_cdata)#nan returned when interaction included
 check_model(b_spat_c_m)
 anova(b_spat_c_m)
+summary(b_spat_c_m)
 testInteractions(b_spat_c_m, pairwise = "FireGrzTrt")
 #SD
 b_spat_c_sd<-lm(spat_c_sd~FireGrzTrt+Year, data=b_spat_cdata)
@@ -2229,7 +2230,7 @@ anova(b_rich_trsct_m)
 b_even_trsct_m<-lmer(Evar~FireGrzTrt*Year+(1|Watershed), data=b_rich_trsct)
 check_model(b_even_trsct_m)
 anova(b_even_trsct_m)
-testInteractions(g_even_trsct_m, pairwise = "FireGrzTrt")
+
 
 #####visuals#####
 #wrangle data from model
@@ -2268,8 +2269,7 @@ b_rich_t_fire_tst$time_fire<-as.factor(b_rich_t_fire_tst$time_fire)
 b_rich_t_fire_tst_m<-lmer(richness~time_fire*Year+(1|Watershed), data=b_rich_t_fire_tst)
 check_model(b_rich_t_fire_tst_m)
 anova(b_rich_t_fire_tst_m)
-testInteractions(g_rich_t_fire_tst_m, pairwise="time_fire", fixed="RecYear")
-testInteractions(b_rich_t_fire_tst_m, pairwise="time_fire")
+
 
 b_even_t_fire_tst_m<-lmer(Evar~time_fire*Year+(1|Watershed), data=b_rich_t_fire_tst)
 check_model(b_even_t_fire_tst_m)
@@ -2318,61 +2318,66 @@ b_permanova<-adonis2(b_dist~b_burn_time_env_data$time_fire+b_burn_time_env_data$
 b_permanova
 #multiple comparisons
 b_pairwise<-pairwise.adonis2(b_dist~time_fire+Watershed+as.factor(Year),by="terms", data=b_burn_time_env_data)
+b_pairwise
+#only PBG0 vs ABG0 different
 
-#####loop;creating a loop to do this####
-#wont work cause two point/transect for ABG
-year_vec_b <- unique(b_burn_time_env_data$Year)
-b_beta_unit <- {}
-
-
-for(YEAR in 1:length(year_vec_b)){
-  vdist_temp_b_unit <- vegdist(filter(b_burn_time_sp_data, b_burn_time_env_data$Year ==  year_vec_b[YEAR]))
-  bdisp_temp_b_unit <- betadisper(vdist_temp_b_unit, filter(b_burn_time_env_data, Year==year_vec_b[YEAR])$FireGrzTrt, type = "centroid")
-  bdisp_out_temp_b_unit <- data.frame(filter(b_burn_time_env_data, Year==year_vec_b[YEAR]), distance = bdisp_temp_b_unit$distances)
-  b_beta_unit <- rbind(b_beta_unit, bdisp_out_temp_b_unit)
-  
-  rm(vdist_temp_b_unit, bdisp_temp_b_unit, bdisp_out_temp_b_unit)
-}
-#write.csv(g_beta_unit, "Data_PBG_species/g_beta_sep_unit.csv")
+####groups based on grassland obligate####
+bird_group<-b_tcomm_df%>%
+  select(-total_count:-wsd_rep)%>%
+  select(Year, FireGrzTrt, Watershed, Transect, SpeciesCode,total_max)%>%
+  pivot_wider(names_from = "SpeciesCode", values_from = "total_max", values_fill = 0)%>%
+  pivot_longer(5:56, names_to = "SpeciesCode", values_to = "abundance")%>%
+  group_by(Year, FireGrzTrt, Watershed, Transect, SpeciesCode)%>%
+  summarise(abundance=mean(abundance, na.rm=T))%>%
+  left_join(PBG_bird_class, by="SpeciesCode")
+bird_group$Grassland=as.factor(bird_group$Grassland)
+bird_grp_data<-bird_group%>%
+  group_by(Year,FireGrzTrt, Watershed, Transect, Grassland)%>%
+  summarise(abund=sum(abundance))%>%
+  group_by(Year,FireGrzTrt, Watershed,Transect)%>%
+  mutate(t_abund=sum(abund),
+         rel_abund=abund/t_abund)
+bird_grp_data$Year<-as.factor(bird_grp_data$Year)
+bird_grp_data$Watershed<-as.factor(bird_grp_data$Watershed)
+bird_grp_data$FireGrzTrt<-as.factor(bird_grp_data$FireGrzTrt)
 #####analysis####
-b_beta_unit$FireGrzTrt=as.factor(b_beta_unit$FireGrzTrt)
-b_beta_unit$Year=as.factor(b_beta_unit$Year)
-b_beta_m<-lmer(distance~FireGrzTrt*Year+(1|Watershed), data=b_beta_unit)
-b_beta_m<-lm(distance~FireGrzTrt*Year, data=b_beta_unit)
-check_model(b_beta_m)
-check_homogeneity(b_beta_m)
-anova(b_beta_m)
+#obligate grassland species
+bird_grass<-lmer(rel_abund~FireGrzTrt*Year+(1|Watershed), data=bird_grp_data[bird_grp_data$Grassland=="TRUE",])
+check_model(bird_grass)
+check_normality(bird_grass)
+anova(bird_grass)
+testInteractions(bird_grass,pairwise="FireGrzTrt")
+b_grass_data<-interactionMeans(bird_grass)%>%
+  mutate(group="Grssld obligate")
 
-#####visual####
-g_beta_viz<-interactionMeans(g_beta_m)%>%
-  mutate(beta =exp(`adjusted mean`),
-         b_up=exp(`adjusted mean`+`SE of link`),
-         b_low=exp(`adjusted mean`-`SE of link`))
-g_beta_fig<-ggplot(g_beta_viz,aes(RecYear, beta,col=FireGrzTrt))+
+#non-grassland obligate species
+bird_non_grass<-lmer(rel_abund~FireGrzTrt*Year+(1|Watershed), data=bird_grp_data[bird_grp_data$Grassland=="FALSE",])
+check_model(bird_non_grass)
+anova(bird_non_grass)
+testInteractions(bird_non_grass,pairwise="FireGrzTrt")
+check_homogeneity(bird_non_grass)
+check_normality(bird_non_grass)
+b_nongrass_data<-interactionMeans(bird_non_grass)%>%
+  mutate(group="Generalist")
+#combine for visual
+b_group_data<-b_grass_data%>%
+  bind_rows(b_nongrass_data)%>%
+  mutate(grp_mean=`adjusted mean`,
+         upper=(`adjusted mean`+`SE of link`),
+         lower=(`adjusted mean`-`SE of link`))
+
+b_grp_data_ready<-b_group_data%>%
+  group_by(group, FireGrzTrt)%>%
+  summarise(grp_m=mean(grp_mean, na.rm=T),
+            grp_upper=mean(upper, na.rm=T),
+            grp_lower=mean(lower, na.rm=T))
+b_group<-ggplot(b_grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
   geom_point(size=5)+
-  geom_path(aes(as.numeric(RecYear)))+
-  geom_errorbar(aes(ymin=b_low,
-                    ymax=b_up),width=0.0125)+
+  geom_errorbar(aes(ymin=grp_lower,
+                    ymax=grp_upper),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Grasshopper betadiversity"))+
-  xlab(label="Year")+
-  theme_bw()+
-  theme(panel.grid.major = element_blank(),  # Remove major gridlines
-        panel.grid.minor = element_blank()   # Remove minor gridlines
-  )
-#summarize across years
-g_beta_viz_avg<-g_beta_viz%>%
-  group_by(FireGrzTrt)%>%
-  summarise(beta_avg=mean(beta, na.rm=T),
-            b_upp=mean(b_up, na.rm=T),
-            b_lower=mean(b_low, na.rm=T))
-g_beta_avg_fig<-ggplot(g_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt))+
-  geom_point(size=5)+
-  geom_errorbar(aes(ymin=b_lower,
-                    ymax=b_upp),width=0.0125)+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Grasshopper betadiversity"))+
-  xlab(label=NULL)+
+  ylab(label="Relative cover")+
+  xlab(label="Bird group")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
