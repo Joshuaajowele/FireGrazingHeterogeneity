@@ -2479,3 +2479,16 @@ b_group_tf<-ggplot(b_grp_data_tf_ready,aes(group, grp_m,col=time_fire))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
+#All figures####
+#combine the transect temporal change
+
+#combine spatial change
+
+#combine temporal change
+
+#combine diversity and beta
+#combine diversity and beta showing each year
+
+#combine NMDS
+
+#combine groups
