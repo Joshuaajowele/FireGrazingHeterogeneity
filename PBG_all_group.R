@@ -1938,7 +1938,9 @@ anova(b_temp_mean_m)
 #temporal variability
 b_temp_sd_m<-lmer(temp_count_sd~FireGrzTrt+(1|Watershed), data=b_temp_countdata)
 check_model(b_temp_sd_m)
+check_outliers(b_temp_sd_m)
 anova(b_temp_sd_m)
+
 
 b_temp_cv_m<-lmer(temp_count_cv~FireGrzTrt+(1|Watershed), data=b_temp_countdata)
 check_model(b_temp_cv_m)
@@ -1993,7 +1995,7 @@ b_TBCV_viz<-ggplot(b_temp_count_vizdata[b_temp_count_vizdata$resp=="count_cv",],
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 ###combine figures####
-b_TBM_viz+b_TBSD_viz+b_TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+bird_temp_viz<-b_TBM_viz/b_TBSD_viz+b_TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 ##Spatial variability at pasture scale####
 b_count_tfire<-PBG_bird_viz_ready_all%>%
@@ -2133,7 +2135,7 @@ b_cv_spat_viz<-ggplot(combo_spat_bcount[combo_spat_bcount$variab=="CV",],aes(Fir
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 ###combine####
-b_t_fire_c_avg_fig+b_sd_spat_viz+b_cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+bird_spatial_viz<-b_t_fire_c_avg_fig/b_sd_spat_viz+b_cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 #Bird composition#####
 b_tcomm_df<-PBG_bird_viz_ready_all%>%
@@ -2270,7 +2272,6 @@ b_rich_t_fire_tst_m<-lmer(richness~time_fire*Year+(1|Watershed), data=b_rich_t_f
 check_model(b_rich_t_fire_tst_m)
 anova(b_rich_t_fire_tst_m)
 
-
 b_even_t_fire_tst_m<-lmer(Evar~time_fire*Year+(1|Watershed), data=b_rich_t_fire_tst)
 check_model(b_even_t_fire_tst_m)
 anova(b_even_t_fire_tst_m)
@@ -2278,6 +2279,48 @@ ggplot(b_rich_t_fire_tst, aes(Year, richness, col=time_fire))+
   geom_boxplot()
 ggplot(b_rich_t_fire_tst, aes(Year, Evar, col=time_fire))+
   geom_boxplot()
+####visual####
+b_rich_tsf<-interactionMeans(b_rich_t_fire_tst_m)%>%
+  mutate(rich =`adjusted mean`,
+         r_up=`adjusted mean`+`SE of link`,
+         r_low=`adjusted mean`-`SE of link`)%>%
+  group_by(time_fire)%>%
+  summarise(rich=mean(rich),
+            r_up=mean(r_up),
+            r_low=mean(r_low))
+b_even_tsf<-interactionMeans(b_even_t_fire_tst_m)%>%
+  mutate(rich =`adjusted mean`,
+         r_up=`adjusted mean`+`SE of link`,
+         r_low=`adjusted mean`-`SE of link`)%>%
+  group_by(time_fire)%>%
+  summarise(rich=mean(rich),
+            r_up=mean(r_up),
+            r_low=mean(r_low))
+
+b_t_fire_rich_avg_fig<-ggplot(b_rich_tsf,aes(time_fire, rich,col=time_fire))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=r_low,
+                    ymax=r_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
+  ylab(label=expression("Bird richness"))+
+  xlab(label="Year since last fire")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+b_t_fire_even_avg_fig<-ggplot(b_even_tsf,aes(time_fire, rich,col=time_fire))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=r_low,
+                    ymax=r_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
+  ylab(label=expression("Bird evenness"))+
+  xlab(label="Year since last fire")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+####combine####
+b_div_timefire<-b_t_fire_rich_avg_fig/b_t_fire_even_avg_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 ###Bird NMDS####
 b_t_fire_comp<-b_tcomm_df%>%
@@ -2319,7 +2362,7 @@ b_permanova
 #multiple comparisons
 b_pairwise<-pairwise.adonis2(b_dist~time_fire+Watershed+as.factor(Year),by="terms", data=b_burn_time_env_data)
 b_pairwise
-#only PBG0 vs ABG0 different
+#only PBG0 vs ABG0 different also ABGO vs PBG2 
 
 ####groups based on grassland obligate####
 bird_group<-b_tcomm_df%>%
@@ -2348,7 +2391,7 @@ check_normality(bird_grass)
 anova(bird_grass)
 testInteractions(bird_grass,pairwise="FireGrzTrt")
 b_grass_data<-interactionMeans(bird_grass)%>%
-  mutate(group="Grssld obligate")
+  mutate(group="Grassland obligate")
 
 #non-grassland obligate species
 bird_non_grass<-lmer(rel_abund~FireGrzTrt*Year+(1|Watershed), data=bird_grp_data[bird_grp_data$Grassland=="FALSE",])
@@ -2376,6 +2419,60 @@ b_group<-ggplot(b_grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
   geom_errorbar(aes(ymin=grp_lower,
                     ymax=grp_upper),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Relative cover")+
+  xlab(label="Bird group")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+#####time since fire####
+bird_grp_data_tf<-bird_group%>%
+  mutate(year_watershed=paste(Year, Watershed, sep="_"))%>%
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  group_by(Year,FireGrzTrt, Watershed, time_fire, Transect, Grassland)%>%
+  summarise(abund=sum(abundance))%>%
+  group_by(Year,FireGrzTrt, Watershed,Transect)%>%
+  mutate(t_abund=sum(abund),
+         rel_abund=abund/t_abund)
+bird_grp_data_tf$Year<-as.factor(bird_grp_data_tf$Year)
+bird_grp_data_tf$Watershed<-as.factor(bird_grp_data_tf$Watershed)
+bird_grp_data_tf$time_fire<-as.factor(bird_grp_data_tf$time_fire)
+
+#####analysis####
+#obligate grassland species
+bird_grass_tf<-lmer(rel_abund~time_fire*Year+(1|Transect), data=bird_grp_data_tf[bird_grp_data_tf$Grassland=="TRUE",])
+check_model(bird_grass_tf)
+check_normality(bird_grass_tf)
+anova(bird_grass_tf)
+testInteractions(bird_grass_tf,pairwise="time_fire")
+b_grass_tf_data<-interactionMeans(bird_grass_tf)%>%
+  mutate(group="Grassland obligate")
+
+#non-grassland obligate species
+bird_non_grass_tf<-lmer(rel_abund~time_fire*Year+(1|Transect), data=bird_grp_data_tf[bird_grp_data_tf$Grassland=="FALSE",])
+check_model(bird_non_grass_tf)
+anova(bird_non_grass_tf)
+testInteractions(bird_non_grass_tf,pairwise="time_fire")
+
+b_nongrass_tf_data<-interactionMeans(bird_non_grass_tf)%>%
+  mutate(group="Generalist")
+#combine for visual
+b_group_data_tf<-b_grass_tf_data%>%
+  bind_rows(b_nongrass_tf_data)%>%
+  mutate(grp_mean=`adjusted mean`,
+         upper=(`adjusted mean`+`SE of link`),
+         lower=(`adjusted mean`-`SE of link`))
+
+b_grp_data_tf_ready<-b_group_data_tf%>%
+  group_by(group, time_fire)%>%
+  summarise(grp_m=mean(grp_mean, na.rm=T),
+            grp_upper=mean(upper, na.rm=T),
+            grp_lower=mean(lower, na.rm=T))
+b_group_tf<-ggplot(b_grp_data_tf_ready,aes(group, grp_m,col=time_fire))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=grp_lower,
+                    ymax=grp_upper),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
   ylab(label="Relative cover")+
   xlab(label="Bird group")+
   theme_bw()+
