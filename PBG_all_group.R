@@ -305,7 +305,7 @@ TBCV_viz<-ggplot(temp_biom_vizdata[temp_biom_vizdata$resp=="biomass_cv",],aes(Fi
   )
 
 ###combine figures####
-TBM_viz+TBSD_viz+TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+biomass_temp_viz<-TBM_viz/TBSD_viz/TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 
 
@@ -445,7 +445,7 @@ biom_cv_fig<-ggplot(biom_cv,aes(Recyear, biomass,col=FireGrzTrt))+
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 ###combine figures####
-biom_mean_fig+biom_sd_fig+biom_cv_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+biomass_spatial_viz<-biom_mean_fig/biom_sd_fig+biom_cv_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 ###average figures####
 #wrangle data
 combo_spat_biom<-biom_mean%>%
@@ -460,7 +460,7 @@ avg_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="AVG",],aes(FireGrz
                     ymax=biom_avg+biom_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Plant Biomass (gm"^-2*")"))+
-  xlab(labe=NULL)+
+  xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -471,7 +471,7 @@ sd_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="SD",],aes(FireGrzTr
                     ymax=biom_avg+biom_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Plant Biomass SD (gm"^-2*")"))+
-  xlab(labe="Fire & grazing treatment")+
+  xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -482,13 +482,13 @@ cv_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="CV",],aes(FireGrzTr
                     ymax=biom_avg+biom_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Plant Biomass CV")+
-  xlab(label="Fire & grazing treatment")+
+  xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 ###combine####
-t_fire_biom_avg_fig+sd_spat_viz+cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+bioma_spatial_avg_viz<-t_fire_biom_avg_fig/sd_spat_viz+cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 #PLANT COMPOSITION####
 ##create required column####
@@ -562,7 +562,7 @@ chang_mean_fig<-ggplot(comp_change_mean,aes(year_diff, comp_chang,col=FireGrzTrt
   geom_errorbar(aes(ymin=chang_low,
                     ymax=chang_up),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Composition change"))+
+  ylab(label=expression("Plant composition change"))+
   xlab(label="Year comparison")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
@@ -579,7 +579,7 @@ avg_chang_viz<-ggplot(chang_avg,aes(FireGrzTrt, comp_chang_avg,col=FireGrzTrt))+
   geom_errorbar(aes(ymin=comp_chang_avg-c_chang_se,
                     ymax=comp_chang_avg+c_chang_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label="Composition change")+
+  ylab(label="Plant composition change")+
   xlab(labe=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
@@ -735,7 +735,7 @@ rich_past_fig<-ggplot(rich_past_viz,aes(FireGrzTrt, richn,col=FireGrzTrt))+
                     ymax=r_upp),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Richness"))+
-  xlab(label="Fire & grazing treatment")+
+  xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -756,7 +756,7 @@ evar_past_fig<-ggplot(even_past_viz,aes(FireGrzTrt, Even,col=FireGrzTrt))+
                     ymax=e_upp),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Evenness"))+
-  xlab(label="Fire & grazing treatment")+
+  xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -1175,13 +1175,13 @@ g_TBCV_viz<-ggplot(g_temp_count_vizdata[g_temp_count_vizdata$resp=="count_cv",],
                     ymax=up),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Grasshopper CV"))+
-  xlab(labe=NULL)+
+  xlab(labe="Fire & grazing treatment")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 ###combine figures####
-g_TBM_viz+g_TBSD_viz+g_TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+g_temp_viz=g_TBM_viz/g_TBSD_viz+g_TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 ##Spatial variability at pasture scale####
 grass_count_tfire<-grassh_count_df%>%
@@ -1313,7 +1313,7 @@ count_cv_fig<-ggplot(gcount_cv,aes(RecYear, count_m,col=FireGrzTrt))+
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 ###combine figures####
-count_mean_fig+count_sd_fig+count_cv_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+g_spatial_viz=count_mean_fig/count_sd_fig+count_cv_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 ###average figures####
 #wrangle data
 combo_spat_gcount<-gcount_mean%>%
@@ -1352,13 +1352,13 @@ g_cv_spat_viz<-ggplot(combo_spat_gcount[combo_spat_gcount$variab=="CV",],aes(Fir
                     ymax=gcount_avg+c_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Grasshopper CV"))+
-  xlab(labe=NULL)+
+  xlab(label="Fire & grazing treatment")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 ###combine####
-g_t_fire_c_avg_fig+g_sd_spat_viz+g_cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+g_spat_avg_viz=g_t_fire_c_avg_fig/g_sd_spat_viz+g_cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 #G composition#####
 #merging key with dataset and removing katydid, etc
@@ -1436,7 +1436,7 @@ g_avg_chang_viz<-ggplot(g_chang_avg,aes(FireGrzTrt, comp_chang_avg,col=FireGrzTr
                     ymax=comp_chang_avg+c_chang_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Grasshopper composition change")+
-  xlab(labe=NULL)+
+  xlab(labe="Fire & grazing treatment")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -1588,7 +1588,7 @@ g_rich_past_fig<-ggplot(g_rich_past_viz,aes(FireGrzTrt, richn,col=FireGrzTrt))+
                     ymax=r_upp),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label=expression("Grasshopper richness"))+
-  xlab(label="Fire & grazing treatment")+
+  xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -1995,7 +1995,7 @@ b_TBCV_viz<-ggplot(b_temp_count_vizdata[b_temp_count_vizdata$resp=="count_cv",],
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 ###combine figures####
-bird_temp_viz<-b_TBM_viz/b_TBSD_viz+b_TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+b_temp_viz=bird_temp_viz<-b_TBM_viz/b_TBSD_viz+b_TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 ##Spatial variability at pasture scale####
 b_count_tfire<-PBG_bird_viz_ready_all%>%
@@ -2135,7 +2135,7 @@ b_cv_spat_viz<-ggplot(combo_spat_bcount[combo_spat_bcount$variab=="CV",],aes(Fir
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 ###combine####
-bird_spatial_viz<-b_t_fire_c_avg_fig/b_sd_spat_viz+b_cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+bird_spatial_avg_viz<-b_t_fire_c_avg_fig/b_sd_spat_viz+b_cv_spat_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 #Bird composition#####
 b_tcomm_df<-PBG_bird_viz_ready_all%>%
@@ -2145,7 +2145,7 @@ b_tcomm_df<-PBG_bird_viz_ready_all%>%
   mutate(rel_abund=total_max/total_count)%>%
   mutate(rep_id=paste(Watershed, FireGrzTrt, Transect, sep="_"),
          wsd_rep=paste(Watershed,Transect, sep="_"))
-##community change calculation yearly in each transect####
+##temporal community change calculation yearly in each transect####
 b_time_change<-multivariate_change(b_tcomm_df, species.var="SpeciesCode",
                                    abundance.var = "rel_abund",
                                    replicate.var="rep_id",
@@ -2479,16 +2479,27 @@ b_group_tf<-ggplot(b_grp_data_tf_ready,aes(group, grp_m,col=time_fire))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
-#All figures####
-#combine the transect temporal change
 
-#combine spatial change
+###need to compare aboslute abundance based on grasshopper and bird groups
+#All figures####
+#combine the transect temporal change abundance
+biomass_temp_viz-g_temp_viz+b_temp_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+#combine spatial change 
+biomass_spatial_viz-g_spatial_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+#combine spatial change average
+bioma_spatial_avg_viz-g_spat_avg_viz+bird_spatial_avg_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 #combine temporal change
-
+avg_chang_viz-g_avg_chang_viz+b_avg_chang_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 #combine diversity and beta
+pl_diver_fig=pl_beta_avg_fig/rich_past_fig/evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+g_diver_fig=g_beta_avg_fig/g_rich_past_fig/g_evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+pl_diver_fig-g_diver_fig+b_div_timefire+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 #combine diversity and beta showing each year
-
+pl_beta_fig+g_beta_fig
 #combine NMDS
-
+pl_nmds_fig=pl_t_s/pl_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+g_nmds_fig=g_t_s/g_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+pl_nmds_fig-g_nmds_fig+b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "top")
 #combine groups
+Pl_group-g_group+b_group_tf+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
