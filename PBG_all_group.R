@@ -152,7 +152,7 @@ coeff_combo<-coeff_2013%>%
   bind_rows(coeff_2014,coeff_2015, coeff_2016, coeff_2017, coeff_2018, 
             coeff_2019, coeff_2020, coeff_2021, coeff_2022, coeff_2023)
 #export as csv file
-write.csv(coeff_combo, "biomass_diskht_reg.csv")
+#write.csv(coeff_combo, "Data_PBG_species/biomass_diskht_reg.csv")
 ##estimate biomass from regression equations####
 biomass_data<-Diskht_data%>%
   mutate(biomass=case_when(Recyear==2013~23.98823740*Diskht+36.97926816,
