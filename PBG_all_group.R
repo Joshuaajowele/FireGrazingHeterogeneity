@@ -2308,7 +2308,7 @@ b_t_fire_rich_avg_fig<-ggplot(b_rich_tsf,aes(time_fire, rich,col=time_fire))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
-b_t_fire_even_avg_fig<-ggplot(b_even_tsf,aes(time_fire, rich,col=time_fire))+
+b_t_fire_even_avg_fig<-ggplot(b_even_tsf,aes(time_fire, rich))+
   geom_point(size=5)+
   geom_errorbar(aes(ymin=r_low,
                     ymax=r_up),width=0.0125)+
@@ -2320,7 +2320,7 @@ b_t_fire_even_avg_fig<-ggplot(b_even_tsf,aes(time_fire, rich,col=time_fire))+
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 ####combine####
-b_div_timefire<-b_t_fire_rich_avg_fig/b_t_fire_even_avg_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+b_div_timefire<-b_rich_grp_com/b_t_fire_even_avg_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 
 ###Bird NMDS####
 b_t_fire_comp<-b_tcomm_df%>%
@@ -2440,7 +2440,7 @@ bird_grp_data_tf$time_fire<-as.factor(bird_grp_data_tf$time_fire)
 
 #####analysis####
 #obligate grassland species
-bird_grass_tf<-lmer(rel_abund~time_fire*Year+(1|Transect), data=bird_grp_data_tf[bird_grp_data_tf$Grassland=="TRUE",])
+bird_grass_tf<-lmer(rel_abund~time_fire*Year+(1|Watershed), data=bird_grp_data_tf[bird_grp_data_tf$Grassland=="TRUE",])
 check_model(bird_grass_tf)
 check_normality(bird_grass_tf)
 anova(bird_grass_tf)
@@ -2449,7 +2449,7 @@ b_grass_tf_data<-interactionMeans(bird_grass_tf)%>%
   mutate(group="Grassland obligate")
 
 #non-grassland obligate species
-bird_non_grass_tf<-lmer(rel_abund~time_fire*Year+(1|Transect), data=bird_grp_data_tf[bird_grp_data_tf$Grassland=="FALSE",])
+bird_non_grass_tf<-lmer(rel_abund~time_fire*Year+(1|Watershed), data=bird_grp_data_tf[bird_grp_data_tf$Grassland=="FALSE",])
 check_model(bird_non_grass_tf)
 anova(bird_non_grass_tf)
 testInteractions(bird_non_grass_tf,pairwise="time_fire")
@@ -2480,7 +2480,105 @@ b_group_tf<-ggplot(b_grp_data_tf_ready,aes(group, grp_m,col=time_fire))+
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 
-###need to compare aboslute abundance based on grasshopper and bird groups
+##rich group time since fire####
+
+bird_grp_data_rich<-bird_group%>%
+  mutate(year_watershed=paste(Year, Watershed, sep="_"))%>%
+  left_join(YrSinceFire_key, by="year_watershed")%>%
+  group_by(Year,FireGrzTrt, Watershed, time_fire, Transect, Grassland)%>%
+  mutate(abund=sum(abundance))%>%
+  filter(abund!=0)%>%
+  group_by(Year,FireGrzTrt, Watershed, time_fire, Transect, Grassland, SpeciesCode)%>%
+  summarise(rel_abund=abundance/abund)%>%
+  ungroup()%>%
+  mutate(rep_id=paste(time_fire, Watershed,Transect,Grassland,Year, sep="_"))
+
+
+b_rich_grp <- community_structure(bird_grp_data_rich, time.var = "Year", 
+                                    abundance.var = "rel_abund",
+                                    replicate.var = "rep_id", metric = "Evar")
+#combine with treatment info
+b_rich_group<-bird_grp_data_rich%>%
+  ungroup()%>%
+  select(time_fire,Watershed,Transect,Grassland,Year, rep_id)%>%
+  distinct()%>%
+  left_join(b_rich_grp, by=c("Year","rep_id"))
+
+#analysis
+b_rich_group$time_fire=as.factor(b_rich_group$time_fire)
+g_obligate<-b_rich_group%>%
+  filter(Grassland==TRUE)
+g_general<-b_rich_group%>%
+  filter(Grassland==FALSE)
+#grassland obligate richness
+g_oblig_rich<-lmer(richness~time_fire*Year+(1|Watershed), data=g_obligate)
+check_model(g_oblig_rich)
+anova(g_oblig_rich)
+testInteractions(g_oblig_rich, pairwise="time_fire")
+#generalist
+g_gen_rich<-lmer(richness~time_fire*Year+(1|Watershed), data=g_general)
+check_model(g_gen_rich)
+anova(g_gen_rich)
+#visual
+g_oblig_viz<-interactionMeans(g_oblig_rich)%>%
+  mutate(rich =`adjusted mean`,
+         r_up=`adjusted mean`+`SE of link`,
+         r_low=`adjusted mean`-`SE of link`)%>%
+  group_by(time_fire)%>%
+  summarise(rich=mean(rich),
+            r_up=mean(r_up),
+            r_low=mean(r_low))%>%
+  mutate(group="Obligate")
+g_gen_viz<-interactionMeans(g_gen_rich)%>%
+  mutate(rich =`adjusted mean`,
+         r_up=`adjusted mean`+`SE of link`,
+         r_low=`adjusted mean`-`SE of link`)%>%
+  group_by(time_fire)%>%
+  summarise(rich=mean(rich),
+            r_up=mean(r_up),
+            r_low=mean(r_low))%>%
+  mutate(group="Generalist")
+#combine
+b_rich_grp_combo<-g_gen_viz%>%
+  bind_rows(g_oblig_viz)%>%
+  group_by(time_fire)%>%
+  mutate(richness=sum(rich))%>%
+  mutate(r_upp=case_when(time_fire=="ABG0"~10.77,
+                         time_fire=="PBG0"~13.17,
+                         time_fire=="PBG1"~14.27,
+                         time_fire=="PBG2"~14.22),
+         r_lower=case_when(time_fire=="ABG0"~5.82,
+         time_fire=="PBG0"~8.22,
+         time_fire=="PBG1"~9.32,
+         time_fire=="PBG2"~9.27))#extracted from bird richness SE calculation in b_rich_tsf
+#stacked bar for richness  by groups
+b_rich_grp_com<-ggplot(b_rich_grp_combo,aes(time_fire, rich,fill=group))+
+  geom_col()+
+  geom_errorbar(aes(ymin=r_lower,
+                    ymax=r_upp),width=0.0125)+
+  scale_fill_manual(values=c(  "#0072B2","#999999", "#0072B2"))+
+  ylab(label=expression("Bird richness"))+
+  xlab(label="Year since last fire")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+#obligate richness
+b_t_fire_g_obligate_fig<-ggplot(g_oblig_viz,aes(time_fire, rich,col=time_fire))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=r_low,
+                    ymax=r_up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
+  ylab(label=expression("Bird richness (grassland obligate)"))+
+  xlab(label="Year since last fire")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+
+###need to compare absolute abundance based on grasshopper and bird groups???
 #All figures####
 #combine the transect temporal change abundance
 biomass_temp_viz-g_temp_viz+b_temp_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
@@ -2503,4 +2601,5 @@ g_nmds_fig=g_t_s/g_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_leve
 pl_nmds_fig-g_nmds_fig+b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "right")
 #combine groups
 Pl_group+g_group+b_group_tf+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+b_rich_grp_com
 
