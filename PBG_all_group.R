@@ -897,9 +897,9 @@ burn_time_mds_scores_n <- data.frame(burn_time_env_data_n, scores(burn_time_mds_
   mutate(NMDS1_mean=mean(NMDS1),
          NMDS2_mean=mean(NMDS2))
 
-#####visual-plotting centroid through time####
+#####NMDS visual-plotting centroid through time####
 pl_t_s<-ggplot(burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=8, stroke=2)+
+  geom_point(size=5, stroke=1)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
   scale_shape_manual(values=c(21:24))+
   theme_bw()+
@@ -907,7 +907,7 @@ pl_t_s<-ggplot(burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 pl_t_n<-ggplot(burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=8, stroke=2)+
+  geom_point(size=5, stroke=1)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
   scale_shape_manual(values=c(21:24))+
   theme_bw()+
@@ -1025,25 +1025,47 @@ Pl_group<-ggplot(grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
   )
 
 #are woody relative cover increasing with year
-woody_l<-lmer(rel_abund~FireGrzTrt+RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_w",])
 woody_l<-lm(log(rel_abund)~FireGrzTrt*as.numeric(RecYear),data=pl_comp_life[pl_comp_life$life_form=="p_w",])
 anova(woody_l)
+testInteractions()
 check_model(woody_l)
-summary(woody_l)
-ggplot(data=pl_comp_life[pl_comp_life$life_form=="p_w",], aes(as.numeric(RecYear), rel_abund, col=FireGrzTrt))+
-  geom_point()+
-  geom_smooth(method="lm")+
-  facet_wrap(~Unit)
-#result much pronounced in south unit which is the unit we have bird data for
-data=pl_comp_life[pl_comp_life$life_form=="p_w",]
-woody_l<-lm(rel_abund~FireGrzTrt*as.numeric(RecYear),data=data[data$Unit=="south",])
-summary(woody_l)#0.889-Adjsuted r square
-check_model(woody_l)
-ggplot(data[data$Unit=="south",], aes(RecYear, rel_abund, col=FireGrzTrt))+
+summary(woody_l)#0.25-Adjsuted r square
+#perennial forbs
+pf_l<-lm(log(rel_abund)~FireGrzTrt*as.numeric(RecYear),data=pl_comp_life[pl_comp_life$life_form=="p_f",])
+summary(pf_l)
+check_model(pf_l)
+pg_l<-lm(log(rel_abund)~FireGrzTrt*as.numeric(RecYear),data=pl_comp_life[pl_comp_life$life_form=="p_g",])
+summary(pg_l)
+check_model(pg_l)
+anova(pg_l)
+
+
+#visual
+ggplot(pl_comp_life[pl_comp_life$life_form=="p_w",], aes(RecYear, rel_abund, col=FireGrzTrt))+
   geom_point(size=3)+
   geom_smooth(method="lm", aes(as.numeric(RecYear)))+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Relative woody cover")+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+ggplot(pl_comp_life[pl_comp_life$life_form=="p_f",], aes(RecYear, rel_abund, col=FireGrzTrt))+
+  geom_point(size=3)+
+  geom_smooth(method="lm", aes(as.numeric(RecYear)))+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Relative abundance of perennial forb")+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+ggplot(pl_comp_life[pl_comp_life$life_form=="p_g",], aes(RecYear, rel_abund, col=FireGrzTrt))+
+  geom_point(size=3)+
+  geom_smooth(method="lm", aes(as.numeric(RecYear)))+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Relative abundance of perennial gramminoid")+
   xlab(label="Year")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
@@ -1748,7 +1770,7 @@ g_burn_time_mds_scores_n <- data.frame(g_burn_time_env_data_n, scores(g_burn_tim
 
 #####visual-plotting centroid through time####
 g_t_s<-ggplot(g_burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=8, stroke=2)+
+  geom_point(size=5, stroke=1)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
   scale_shape_manual(values=c(21:24))+
   theme_bw()+
@@ -1756,7 +1778,7 @@ g_t_s<-ggplot(g_burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=tim
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 g_t_n<-ggplot(g_burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=8, stroke=2)+
+  geom_point(size=5, stroke=1)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
   scale_shape_manual(values=c(21:24))+
   theme_bw()+
@@ -2319,8 +2341,6 @@ b_t_fire_even_avg_fig<-ggplot(b_even_tsf,aes(time_fire, rich))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
-####combine####
-b_div_timefire<-b_rich_grp_com/b_t_fire_even_avg_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 
 ###Bird NMDS####
 b_t_fire_comp<-b_tcomm_df%>%
@@ -2347,7 +2367,7 @@ b_burn_time_mds_scores<- data.frame(b_burn_time_env_data, scores(b_burn_time_mds
 
 #####visual-plotting centroid through time####
 b_t_s<-ggplot(b_burn_time_mds_scores, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=8, stroke=2)+
+  geom_point(size=5, stroke=1)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
   scale_shape_manual(values=c(21:24))+
   theme_bw()+
@@ -2479,7 +2499,17 @@ b_group_tf<-ggplot(b_grp_data_tf_ready,aes(group, grp_m,col=time_fire))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
-
+#bird group increasing by year? add time since fire 
+ggplot(bird_grp_data[bird_grp_data$Grassland=="TRUE",], aes(Year, rel_abund, col=FireGrzTrt))+
+  geom_point(size=3)+
+  geom_smooth(method="lm", aes(as.numeric(Year)))+
+  scale_color_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
+  ylab(label="Relative abundance grassland obligate bird")+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
 ##rich group time since fire####
 
 bird_grp_data_rich<-bird_group%>%
@@ -2563,6 +2593,8 @@ b_rich_grp_com<-ggplot(b_rich_grp_combo,aes(time_fire, rich,fill=group))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
+####combine####
+b_div_timefire<-b_rich_grp_com/b_t_fire_even_avg_fig+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 
 #obligate richness
 b_t_fire_g_obligate_fig<-ggplot(g_oblig_viz,aes(time_fire, rich,col=time_fire))+
@@ -2599,6 +2631,9 @@ pl_beta_fig+g_beta_fig
 pl_nmds_fig=pl_t_s/pl_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 g_nmds_fig=g_t_s/g_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 pl_nmds_fig-g_nmds_fig+b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "right")
+pl_nmds_fig-g_nmds_fig+b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+pl_nmds_fig-g_nmds_fig+b_t_s/b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
 #combine groups
 Pl_group+g_group+b_group_tf+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 b_rich_grp_com
