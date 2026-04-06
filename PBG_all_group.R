@@ -1,6 +1,6 @@
 #Author: Joshua Ajowele####
 #This script is for plant biomass and species composition response to fire and grazing heterogeneity
-#Date: Feb 6, 2026 Last modified: March 11, 2026
+#Date: Feb 6, 2026 Last modified: April 6, 2026
 
 #Load library####
 library(tidyverse)
@@ -898,18 +898,18 @@ burn_time_mds_scores_n <- data.frame(burn_time_env_data_n, scores(burn_time_mds_
          NMDS2_mean=mean(NMDS2))
 
 #####NMDS visual-plotting centroid through time####
-pl_t_s<-ggplot(burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=5, stroke=1)+
+pl_t_s<-ggplot(burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, shape= Watershed, fill=time_fire))+
+  geom_point(size=4, stroke=1)+
+  scale_shape_manual(values=c(21,21,21,21))+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
-  scale_shape_manual(values=c(21:24))+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 pl_t_n<-ggplot(burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=5, stroke=1)+
+  geom_point(size=4, stroke=1)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
-  scale_shape_manual(values=c(21:24))+
+  scale_shape_manual(values=c(21,21,21,21))+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -1012,11 +1012,22 @@ grp_data_ready<-group_data%>%
   summarise(grp_m=mean(grp_mean, na.rm=T),
             grp_upper=mean(grp_upper, na.rm=T),
             grp_lower=mean(grp_lower, na.rm=T))
-Pl_group<-ggplot(grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
-  geom_point(size=5)+
+# Pl_group<-ggplot(grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
+#   geom_point(size=5, position = position_jitter(width=.5))+
+#   geom_errorbar(aes(ymin=grp_lower,
+#                     ymax=grp_upper),width=0.0125)+
+#   scale_color_manual(values=c( "#F0E442", "#009E73"))+
+#   ylab(label="Relative cover")+
+#   xlab(label="Plant group")+
+#   theme_bw()+
+#   theme(panel.grid.major = element_blank(),  # Remove major gridlines
+#         panel.grid.minor = element_blank()   # Remove minor gridlines
+#   )#showing as point figure
+Pl_group<-ggplot(grp_data_ready,aes(group, grp_m,fill=FireGrzTrt))+
+  geom_col(position = position_dodge())+
   geom_errorbar(aes(ymin=grp_lower,
-                    ymax=grp_upper),width=0.0125)+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+                    ymax=grp_upper),width=0.0125,position = position_dodge(width=1))+
+  scale_fill_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Relative cover")+
   xlab(label="Plant group")+
   theme_bw()+
@@ -1027,7 +1038,6 @@ Pl_group<-ggplot(grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
 #are woody relative cover increasing with year
 woody_l<-lm(log(rel_abund)~FireGrzTrt*as.numeric(RecYear),data=pl_comp_life[pl_comp_life$life_form=="p_w",])
 anova(woody_l)
-testInteractions()
 check_model(woody_l)
 summary(woody_l)#0.25-Adjsuted r square
 #perennial forbs
@@ -1770,17 +1780,17 @@ g_burn_time_mds_scores_n <- data.frame(g_burn_time_env_data_n, scores(g_burn_tim
 
 #####visual-plotting centroid through time####
 g_t_s<-ggplot(g_burn_time_mds_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=5, stroke=1)+
+  geom_point(size=4, stroke=1)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
-  scale_shape_manual(values=c(21:24))+
+  scale_shape_manual(values=c(21,21,21,21))+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 g_t_n<-ggplot(g_burn_time_mds_scores_n, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=5, stroke=1)+
+  geom_point(size=4, stroke=1)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
-  scale_shape_manual(values=c(21:24))+
+  scale_shape_manual(values=c(21,21,21,21))+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -1869,11 +1879,11 @@ g_grp_data_ready<-g_group_data%>%
   summarise(grp_m=mean(grp_mean, na.rm=T),
             grp_upper=mean(upper, na.rm=T),
             grp_lower=mean(lower, na.rm=T))
-g_group<-ggplot(g_grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
-  geom_point(size=5)+
+g_group<-ggplot(g_grp_data_ready,aes(group, grp_m,fill=FireGrzTrt))+
+  geom_col(position = position_dodge())+
   geom_errorbar(aes(ymin=grp_lower,
-                    ymax=grp_upper),width=0.0125)+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+                    ymax=grp_upper),width=0.0125,position = position_dodge(width=1))+
+  scale_fill_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Relative cover")+
   xlab(label="Grasshopper group")+
   theme_bw()+
@@ -2367,9 +2377,9 @@ b_burn_time_mds_scores<- data.frame(b_burn_time_env_data, scores(b_burn_time_mds
 
 #####visual-plotting centroid through time####
 b_t_s<-ggplot(b_burn_time_mds_scores, aes(x=NMDS1_mean, y=NMDS2_mean, fill=time_fire, shape=Watershed))+
-  geom_point(size=5, stroke=1)+
+  geom_point(size=4, stroke=1)+
   scale_fill_manual(values=c("#F0E442", "#994F00", "#999999", "#0072B2"))+
-  scale_shape_manual(values=c(21:24))+
+  scale_shape_manual(values=c(21,21,21,21))+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -2483,16 +2493,17 @@ b_group_data_tf<-b_grass_tf_data%>%
          upper=(`adjusted mean`+`SE of link`),
          lower=(`adjusted mean`-`SE of link`))
 
+
 b_grp_data_tf_ready<-b_group_data_tf%>%
   group_by(group, time_fire)%>%
   summarise(grp_m=mean(grp_mean, na.rm=T),
             grp_upper=mean(upper, na.rm=T),
             grp_lower=mean(lower, na.rm=T))
-b_group_tf<-ggplot(b_grp_data_tf_ready,aes(group, grp_m,col=time_fire))+
-  geom_point(size=5)+
+b_group_tf<-ggplot(b_grp_data_tf_ready,aes(group, grp_m,fill=time_fire))+
+  geom_col(position = position_dodge())+
   geom_errorbar(aes(ymin=grp_lower,
-                    ymax=grp_upper),width=0.0125)+
-  scale_color_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
+                    ymax=grp_upper),width=0.0125,position = position_dodge(width=.9))+
+  scale_fill_manual(values=c( "#F0E442", "#994F00", "#999999", "#0072B2"))+
   ylab(label="Relative cover")+
   xlab(label="Bird group")+
   theme_bw()+
@@ -2630,8 +2641,6 @@ pl_beta_fig+g_beta_fig
 #combine NMDS
 pl_nmds_fig=pl_t_s/pl_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 g_nmds_fig=g_t_s/g_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
-pl_nmds_fig-g_nmds_fig+b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "right")
-pl_nmds_fig-g_nmds_fig+b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 pl_nmds_fig-g_nmds_fig+b_t_s/b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 #combine groups
