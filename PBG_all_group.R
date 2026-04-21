@@ -65,6 +65,10 @@ PBG_bird_updated<-read_excel("Data_PBG_species/Qy_ExportPBGSurveyData_Feb2026.xl
 unique(PBG_bird_C1A$Year)
 #2019 data is missing for C1A-talk to Alice
 PBG_bird_class<-read_excel("Data_PBG_species/KNZSpecies.xlsx")
+#precipitation and temperature data
+ppt_data<-read.csv("Data_PBG_species/APT011.csv")
+temp_data<-read.csv("Data_PBG_species/AWE012.csv")
+
 #BIOMASS####
 ##modify data####
 biomass_reg <- biomass_diskpasture%>%
@@ -2646,4 +2650,32 @@ pl_nmds_fig-g_nmds_fig+b_t_s/b_t_s+plot_layout(guides = "collect")&plot_annotati
 #combine groups
 Pl_group+g_group+b_group_tf+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 b_rich_grp_com
+
+
+#Precipitation and Temperature data####
+ppt_data$ppt=as.numeric(ppt_data$ppt)
+MAP_1983_2023<-ppt_data%>%
+  separate_wider_delim(RecDate, delim="-",names=c("Year","Month", "Day"))%>%  
+  ungroup()%>%
+  filter(!Year%in%c(1982,2024,2025))%>%
+  group_by(Year, Month)%>%
+  summarise(precip=sum(ppt, na.rm=T))%>%
+  group_by(Year)%>%
+  summarise(precip_avg=sum(precip))%>%
+  ungroup()%>%
+  mutate(MAP=mean(precip_avg, na.rm=T))
+  
+MAT_1983_2023<-temp_data
+MAT_1983_2023$RECYEAR<-as.factor(MAT_1983_2023$RECYEAR)
+MAT_1983_2023$RECMONTH<-as.factor(MAT_1983_2023$RECMONTH)
+MAT_1983_2023$RECDAY<-as.factor(MAT_1983_2023$RECDAY) 
+MAT_1983_2023$TAVE<-as.numeric(MAT_1983_2023$TAVE) 
+MAT_1983_2023<-MAT_1983_2023%>%
+  group_by(RECYEAR, RECMONTH)%>%
+  summarise(Tave=mean(TAVE, na.rm=T))%>%
+  filter(RECYEAR%in%1983:2023)%>%
+  group_by(RECYEAR)%>%
+  summarise(Tave_avg=mean(Tave,na.rm=T))%>%
+  ungroup()%>%
+  mutate(Tave_mean=mean(Tave_avg,na.rm=T))
 
