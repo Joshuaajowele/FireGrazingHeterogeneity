@@ -1,6 +1,6 @@
 #Author: Joshua Ajowele####
 #This script is for plant biomass and species composition response to fire and grazing heterogeneity
-#Date: Feb 6, 2026 Last modified: April 6, 2026
+#Date: Feb 6, 2026 Last modified: June 16, 2026
 
 #Load library####
 library(tidyverse)
@@ -549,10 +549,10 @@ t_change$Watershed<-as.factor(t_change$Watershed)
 t_change$year_diff<-as.factor(t_change$year_diff)
 
 ##model for analysis####
-t_ch_m<-lmer(log(composition_change)~FireGrzTrt*year_diff+(1|Unit/Watershed), data=t_change)
+t_ch_m<-lmer(log(composition_change)~FireGrzTrt+(1|Unit/Watershed), data=t_change)
 anova(t_ch_m)
 check_model(t_ch_m)
-testInteractions(t_ch_m, pairwise = "FireGrzTrt", fixed="year_diff")
+
 ##visuals####
 #wrangle data from model
 comp_change_mean<-interactionMeans(t_ch_m)%>%
@@ -560,28 +560,12 @@ comp_change_mean<-interactionMeans(t_ch_m)%>%
          chang_up=exp(`adjusted mean`+`SE of link`),
          chang_low=exp(`adjusted mean`-`SE of link`))
 
-chang_mean_fig<-ggplot(comp_change_mean,aes(year_diff, comp_chang,col=FireGrzTrt))+
+
+#visual
+avg_chang_viz<-ggplot(comp_change_mean,aes(FireGrzTrt, comp_chang,col=FireGrzTrt))+
   geom_point(size=5)+
-  geom_path(aes(as.numeric(year_diff)))+
   geom_errorbar(aes(ymin=chang_low,
                     ymax=chang_up),width=0.0125)+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Plant composition change"))+
-  xlab(label="Year comparison")+
-  theme_bw()+
-  theme(panel.grid.major = element_blank(),  # Remove major gridlines
-        panel.grid.minor = element_blank()   # Remove minor gridlines
-  )
-#calculate average 
-chang_avg<-comp_change_mean%>%
-  group_by(FireGrzTrt)%>%
-  summarise(comp_chang_avg=mean(comp_chang, na.rm=T),
-            c_chang_se=SE_function(comp_chang))
-#visual
-avg_chang_viz<-ggplot(chang_avg,aes(FireGrzTrt, comp_chang_avg,col=FireGrzTrt))+
-  geom_point(size=5)+
-  geom_errorbar(aes(ymin=comp_chang_avg-c_chang_se,
-                    ymax=comp_chang_avg+c_chang_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Plant composition change")+
   xlab(labe=NULL)+
@@ -800,7 +784,6 @@ year_vec_pl <- unique(pl_env_data$RecYear)
 pl_perm_unit <- {}
 pl_beta_unit <- {}
 
-
 for(YEAR in 1:length(year_vec_pl)){
   vdist_temp_pl_unit <- vegdist(filter(pl_sp_data, pl_env_data$RecYear ==  year_vec_pl[YEAR]))
   permanova_temp_pl_unit <- adonis2(vdist_temp_pl_unit ~ subset(pl_env_data, RecYear == year_vec_pl[YEAR])$unit_trt)
@@ -862,6 +845,26 @@ pl_beta_avg_fig<-ggplot(pl_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt)
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 
+####PBG plant composition NMDS####
+
+Fire_nmds_pl <- metaMDS(pl_sp_data, distance = "bray",k=2) 
+#combine NMDS1 and 2 with factor columns and create centroids
+fire_scores_s <- data.frame(pl_env_data, scores(Fire_nmds_pl, display="sites"))%>%
+  group_by(RecYear, Unit,FireGrzTrt)%>%
+  mutate(NMDS1_mean=mean(NMDS1),
+         NMDS2_mean=mean(NMDS2))
+
+pl_fire_viz<-ggplot(fire_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, shape= Unit, fill=FireGrzTrt))+
+  geom_point(size=4, stroke=1)+
+  scale_shape_manual(values=c(21,22))+
+  scale_fill_manual(values=c("#F0E442", "#009E73"))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+#combine figures
+pl_fire_viz
 ####time since fire composition####
 #separate south and north unit
 pl_t_fire_comp_s<-pl_species_comp%>%
@@ -972,20 +975,20 @@ check_model(peren_grass)
 anova(peren_grass)
 testInteractions(peren_grass,pairwise="FireGrzTrt", fixed="RecYear")
 pgrass_data<-interactionMeans(peren_grass)%>%
-  mutate(group="perennial graminoid")
+  mutate(group="peren gram")
 #annual grass
 ann_grass<-lmer(sqrt(rel_abund)~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="a_g",])
 check_model(ann_grass)
 anova(ann_grass)
 agrass_data<-interactionMeans(ann_grass)%>%
-  mutate(group="annual graminoid")
+  mutate(group="annual gram")
 
 #perennial forbish
 peren_forb<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_f",])
 check_model(peren_forb)
 anova(peren_forb)
 pforb_data<-interactionMeans(peren_forb)%>%
-  mutate(group="perennial forb")
+  mutate(group="peren forb")
 #annual forb
 ann_forb<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="a_f",])
 check_model(ann_forb)
@@ -1005,11 +1008,11 @@ group_data<-pgrass_data%>%
   bind_rows(agrass_data,aforb_data,pforb_data, woody_data)%>%
   mutate(upper=(`adjusted mean`+`SE of link`),
          lower=(`adjusted mean`-`SE of link`),
-         grp_mean=case_when(group=="annual graminoid"~(`adjusted mean`)^2,
+         grp_mean=case_when(group=="annual gram"~(`adjusted mean`)^2,
                                                       TRUE~`adjusted mean`),
-         grp_upper=case_when(group=="annual graminoid"~(upper)^2,
+         grp_upper=case_when(group=="annual gram"~(upper)^2,
                                                           TRUE~upper),
-         grp_lower=case_when(group=="annual graminoid"~(lower)^2,
+         grp_lower=case_when(group=="annual gram"~(lower)^2,
                                                TRUE~lower))
 grp_data_ready<-group_data%>%
   group_by(group, FireGrzTrt)%>%
@@ -1027,7 +1030,8 @@ grp_data_ready<-group_data%>%
 #   theme(panel.grid.major = element_blank(),  # Remove major gridlines
 #         panel.grid.minor = element_blank()   # Remove minor gridlines
 #   )#showing as point figure
-Pl_group<-ggplot(grp_data_ready,aes(group, grp_m,fill=FireGrzTrt))+
+#using reorder to arrange in descending order of values
+Pl_group<-ggplot(grp_data_ready,aes(reorder(group, -grp_m),grp_m,fill=FireGrzTrt))+
   geom_col(position = position_dodge())+
   geom_errorbar(aes(ymin=grp_lower,
                     ymax=grp_upper),width=0.0125,position = position_dodge(width=1))+
