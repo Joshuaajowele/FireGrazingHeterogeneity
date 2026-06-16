@@ -863,8 +863,6 @@ pl_fire_viz<-ggplot(fire_scores_s, aes(x=NMDS1_mean, y=NMDS2_mean, shape= Unit, 
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 
-#combine figures
-pl_fire_viz
 ####time since fire composition####
 #separate south and north unit
 pl_t_fire_comp_s<-pl_species_comp%>%
@@ -975,26 +973,26 @@ check_model(peren_grass)
 anova(peren_grass)
 testInteractions(peren_grass,pairwise="FireGrzTrt", fixed="RecYear")
 pgrass_data<-interactionMeans(peren_grass)%>%
-  mutate(group="peren gram")
+  mutate(group="P.gram")
 #annual grass
 ann_grass<-lmer(sqrt(rel_abund)~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="a_g",])
 check_model(ann_grass)
 anova(ann_grass)
 agrass_data<-interactionMeans(ann_grass)%>%
-  mutate(group="annual gram")
+  mutate(group="A.gram")
 
 #perennial forbish
 peren_forb<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_f",])
 check_model(peren_forb)
 anova(peren_forb)
 pforb_data<-interactionMeans(peren_forb)%>%
-  mutate(group="peren forb")
+  mutate(group="P.forb")
 #annual forb
 ann_forb<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="a_f",])
 check_model(ann_forb)
 anova(ann_forb)
 aforb_data<-interactionMeans(ann_forb)%>%
-  mutate(group="annual forb")
+  mutate(group="A.forb")
 #woody
 woody<-lmer(rel_abund~FireGrzTrt*RecYear+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_w",])
 check_model(woody)
@@ -1008,11 +1006,11 @@ group_data<-pgrass_data%>%
   bind_rows(agrass_data,aforb_data,pforb_data, woody_data)%>%
   mutate(upper=(`adjusted mean`+`SE of link`),
          lower=(`adjusted mean`-`SE of link`),
-         grp_mean=case_when(group=="annual gram"~(`adjusted mean`)^2,
+         grp_mean=case_when(group=="A.gram"~(`adjusted mean`)^2,
                                                       TRUE~`adjusted mean`),
-         grp_upper=case_when(group=="annual gram"~(upper)^2,
+         grp_upper=case_when(group=="A.gram"~(upper)^2,
                                                           TRUE~upper),
-         grp_lower=case_when(group=="annual gram"~(lower)^2,
+         grp_lower=case_when(group=="A.gram"~(lower)^2,
                                                TRUE~lower))
 grp_data_ready<-group_data%>%
   group_by(group, FireGrzTrt)%>%
@@ -1441,7 +1439,7 @@ g_t_change$Watershed<-as.factor(g_t_change$Watershed)
 g_t_change$year_diff<-as.factor(g_t_change$year_diff)
 
 ##model for analysis####
-g_t_ch_m<-lmer(composition_change~FireGrzTrt*year_diff+(1|Unit/Watershed), data=g_t_change)
+g_t_ch_m<-lmer(composition_change~FireGrzTrt+(1|Unit/Watershed), data=g_t_change)
 check_model(g_t_ch_m)
 anova(g_t_ch_m)
 testInteractions(g_t_ch_m, pairwise = "FireGrzTrt")
@@ -1452,28 +1450,12 @@ g_comp_change_mean<-interactionMeans(g_t_ch_m)%>%
          chang_up=(`adjusted mean`+`SE of link`),
          chang_low=(`adjusted mean`-`SE of link`))
 
-g_chang_mean_fig<-ggplot(g_comp_change_mean,aes(year_diff, comp_chang,col=FireGrzTrt))+
+
+#visual
+g_avg_chang_viz<-ggplot(g_comp_change_mean,aes(FireGrzTrt, comp_chang,col=FireGrzTrt))+
   geom_point(size=5)+
-  geom_path(aes(as.numeric(year_diff)))+
   geom_errorbar(aes(ymin=chang_low,
                     ymax=chang_up),width=0.0125)+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Grasshopper composition change"))+
-  xlab(label="Year comparison")+
-  theme_bw()+
-  theme(panel.grid.major = element_blank(),  # Remove major gridlines
-        panel.grid.minor = element_blank()   # Remove minor gridlines
-  )
-#calculate average 
-g_chang_avg<-g_comp_change_mean%>%
-  group_by(FireGrzTrt)%>%
-  summarise(comp_chang_avg=mean(comp_chang, na.rm=T),
-            c_chang_se=SE_function(comp_chang))
-#visual
-g_avg_chang_viz<-ggplot(g_chang_avg,aes(FireGrzTrt, comp_chang_avg,col=FireGrzTrt))+
-  geom_point(size=5)+
-  geom_errorbar(aes(ymin=comp_chang_avg-c_chang_se,
-                    ymax=comp_chang_avg+c_chang_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Grasshopper composition change")+
   xlab(labe="Fire & grazing treatment")+
@@ -1694,6 +1676,12 @@ g_beta_unit <- {}
 
 for(YEAR in 1:length(year_vec_g)){
   vdist_temp_g_unit <- vegdist(filter(g_sp_data, g_env_data$RecYear ==  year_vec_g[YEAR]))
+  permanova_temp_g_unit <- adonis2(vdist_temp_g_unit ~ subset(g_env_data, RecYear == year_vec_g[YEAR])$unit_trt)
+  permanova_out_temp_g_unit <- data.frame(RecYear = year_vec_g[YEAR], 
+                                           DF = permanova_temp_g_unit$Df,
+                                           F_value = permanova_temp_g_unit$`F`,
+                                           P_value = permanova_temp_g_unit$`Pr(>F)`)
+  g_perm_unit <- rbind(g_perm_unit,permanova_out_temp_g_unit)
   bdisp_temp_g_unit <- betadisper(vdist_temp_g_unit, filter(g_env_data, RecYear==year_vec_g[YEAR])$unit_trt, type = "centroid")
   bdisp_out_temp_g_unit <- data.frame(filter(g_env_data, RecYear==year_vec_g[YEAR]), distance = bdisp_temp_g_unit$distances)
   g_beta_unit <- rbind(g_beta_unit, bdisp_out_temp_g_unit)
@@ -1744,7 +1732,26 @@ g_beta_avg_fig<-ggplot(g_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt))+
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 
-####G NMDS####
+####G PBG composition FireGrzTrT####
+g_fire_mds <- metaMDS(g_sp_data, distance = "bray",k=2) 
+#combine NMDS1 and 2 with factor columns and create centroids
+g_fire_scores <- data.frame(g_env_data, scores(g_fire_mds, display="sites"))%>%
+  group_by(RecYear, Unit,FireGrzTrt)%>%
+  mutate(NMDS1_mean=mean(NMDS1),
+         NMDS2_mean=mean(NMDS2))
+g_fire_viz<-ggplot(g_fire_scores, aes(x=NMDS1_mean, y=NMDS2_mean, shape= Unit, fill=FireGrzTrt))+
+  geom_point(size=4, stroke=1)+
+  scale_shape_manual(values=c(21,22))+
+  scale_fill_manual(values=c("#F0E442", "#009E73"))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+
+
+
+####G NMDS year since fire####
 g_t_fire_comp_s<-grassh_tcomm_df%>%
   mutate(year_watershed=paste(RecYear, Watershed, sep="_"))%>%
   left_join(YrSinceFire_key, by="year_watershed")%>%
@@ -1887,7 +1894,7 @@ g_grp_data_ready<-g_group_data%>%
   summarise(grp_m=mean(grp_mean, na.rm=T),
             grp_upper=mean(upper, na.rm=T),
             grp_lower=mean(lower, na.rm=T))
-g_group<-ggplot(g_grp_data_ready,aes(group, grp_m,fill=FireGrzTrt))+
+g_group<-ggplot(g_grp_data_ready,aes(reorder(group, -grp_m),grp_m,fill=FireGrzTrt))+
   geom_col(position = position_dodge())+
   geom_errorbar(aes(ymin=grp_lower,
                     ymax=grp_upper),width=0.0125,position = position_dodge(width=1))+
@@ -2205,7 +2212,7 @@ b_t_change$Watershed<-as.factor(b_t_change$Watershed)
 b_t_change$year_diff<-as.factor(b_t_change$year_diff)
 
 ##model for analysis####
-b_t_ch_m<-lmer(composition_change~FireGrzTrt*year_diff+(1|Watershed), data=b_t_change)
+b_t_ch_m<-lmer(composition_change~FireGrzTrt+(1|Watershed), data=b_t_change)
 check_model(b_t_ch_m)
 anova(b_t_ch_m)
 
@@ -2216,28 +2223,12 @@ b_comp_change_mean<-interactionMeans(b_t_ch_m)%>%
          chang_up=(`adjusted mean`+`SE of link`),
          chang_low=(`adjusted mean`-`SE of link`))
 
-b_chang_mean_fig<-ggplot(b_comp_change_mean,aes(year_diff, comp_chang,col=FireGrzTrt))+
+
+#visual
+b_avg_chang_viz<-ggplot(b_comp_change_mean,aes(FireGrzTrt, comp_chang,col=FireGrzTrt))+
   geom_point(size=5)+
-  geom_path(aes(as.numeric(year_diff)))+
   geom_errorbar(aes(ymin=chang_low,
                     ymax=chang_up),width=0.0125)+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Bird composition change"))+
-  xlab(label="Year comparison")+
-  theme_bw()+
-  theme(panel.grid.major = element_blank(),  # Remove major gridlines
-        panel.grid.minor = element_blank()   # Remove minor gridlines
-  )
-#calculate average 
-b_chang_avg<-b_comp_change_mean%>%
-  group_by(FireGrzTrt)%>%
-  summarise(comp_chang_avg=mean(comp_chang, na.rm=T),
-            c_chang_se=SE_function(comp_chang))
-#visual
-b_avg_chang_viz<-ggplot(b_chang_avg,aes(FireGrzTrt, comp_chang_avg,col=FireGrzTrt))+
-  geom_point(size=5)+
-  geom_errorbar(aes(ymin=comp_chang_avg-c_chang_se,
-                    ymax=comp_chang_avg+c_chang_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Bird composition change")+
   xlab(labe=NULL)+
@@ -2401,7 +2392,25 @@ b_permanova
 b_pairwise<-pairwise.adonis2(b_dist~time_fire+Watershed+as.factor(Year),by="terms", data=b_burn_time_env_data)
 b_pairwise
 #only PBG0 vs ABG0 different also ABGO vs PBG2 
+#comparing differences based on fire and grazing treatment
+b_permanova_fire<-adonis2(b_dist~b_burn_time_env_data$FireGrzTrt+as.factor(b_burn_time_env_data$Year), by="terms")
+b_permanova_fire #PBG differs from ABG
 
+####PBG bird comp FireGrzTrt####
+#combine NMDS1 and 2 with factor columns and create centroids
+b_FireGrzTrt_mds_scores<- data.frame(b_burn_time_env_data, scores(b_burn_time_mds, display="sites"))%>%
+  group_by(Year,FireGrzTrt)%>%
+  mutate(NMDS1_mean=mean(NMDS1),
+         NMDS2_mean=mean(NMDS2))
+b_fire_viz<-ggplot(b_FireGrzTrt_mds_scores, aes(x=NMDS1_mean, y=NMDS2_mean,shape=FireGrzTrt,fill=FireGrzTrt))+
+  geom_point(size=4, stroke=1)+
+  scale_shape_manual(values=c(22,22))+
+  scale_fill_manual(values=c("#F0E442", "#009E73"))+
+  scale_color_manual(values=c("#F0E442", "#009E73"))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
 ####groups based on grassland obligate####
 bird_group<-b_tcomm_df%>%
   select(-total_count:-wsd_rep)%>%
@@ -2452,11 +2461,11 @@ b_grp_data_ready<-b_group_data%>%
   summarise(grp_m=mean(grp_mean, na.rm=T),
             grp_upper=mean(upper, na.rm=T),
             grp_lower=mean(lower, na.rm=T))
-b_group<-ggplot(b_grp_data_ready,aes(group, grp_m,col=FireGrzTrt))+
-  geom_point(size=5)+
+b_group<-ggplot(b_grp_data_ready,aes(reorder(group, -grp_m),grp_m,fill=FireGrzTrt))+
+  geom_col(position = position_dodge())+
   geom_errorbar(aes(ymin=grp_lower,
-                    ymax=grp_upper),width=0.0125)+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+                    ymax=grp_upper),width=0.0125,position = position_dodge(width=.9))+
+  scale_fill_manual(values=c( "#F0E442", "#009E73"))+
   ylab(label="Relative cover")+
   xlab(label="Bird group")+
   theme_bw()+
@@ -2651,10 +2660,17 @@ pl_nmds_fig=pl_t_s/pl_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_l
 g_nmds_fig=g_t_s/g_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 pl_nmds_fig-g_nmds_fig+b_t_s/b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
+
+#combine nmds based on firegrztrt
+
+nmds_firegrztrt<-pl_fire_viz+g_fire_viz+b_fire_viz+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+
 #combine groups
 Pl_group+g_group+b_group_tf+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 b_rich_grp_com
-
+firgrzt_grp=Pl_group+g_group+b_group+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+#
+nmds_firegrztrt/firgrzt_grp&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 
 #Precipitation and Temperature data####
 ppt_data$ppt=as.numeric(ppt_data$ppt)
