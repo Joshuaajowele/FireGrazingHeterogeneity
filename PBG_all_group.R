@@ -773,6 +773,7 @@ pl_comp_wide<-pl_species_comp%>%
   mutate(unit_trt=paste(Unit, FireGrzTrt, sep="_"))%>%
   pivot_wider(names_from = sp, values_from = abundance, values_fill = 0)
   
+
 # Separate pcomp and environmental columns
 pl_sp_data <- pl_comp_wide %>%
   ungroup()%>%
@@ -797,8 +798,11 @@ for(YEAR in 1:length(year_vec_pl)){
   bdisp_out_temp_pl_unit <- data.frame(filter(pl_env_data, RecYear==year_vec_pl[YEAR]), distance = bdisp_temp_pl_unit$distances)
   pl_beta_unit <- rbind(pl_beta_unit, bdisp_out_temp_pl_unit)
   
-  rm(vdist_temp_pl_unit, permanova_temp_pl_unit, permanova_out_temp_pl_unit, bdisp_temp_pl_unit, bdisp_out_temp_pl_unit)
+  rm(permanova_temp_pl_unit, permanova_out_temp_pl_unit, bdisp_temp_pl_unit, bdisp_out_temp_pl_unit)
 }
+
+
+
 #write.csv(pl_beta_unit, "Data_PBG_species/plant_beta_sep_unit.csv")
 #write.csv(pl_perm_unit, "Data_PBG_species/plant_perm_sep_unit.csv")
 #pl_beta_unit<-read_csv("Data_PBG_species/plant_beta_sep_unit.csv")
@@ -929,6 +933,10 @@ permanova_south
 #multiple comparisons
 pairwise_south<-pairwise.adonis2(dist_south~time_fire+Watershed+as.factor(RecYear),by="terms", data=burn_time_env_data_s)
 
+#PBG vs ABG 
+permanova_fire_s<-adonis2(dist_south~burn_time_env_data_s$FireGrzTrt+as.factor(burn_time_env_data_s$RecYear), by="terms")
+permanova_fire_s
+
 #comparing time since fire within each watershed to validate
 wat_south<-vegdist(burn_time_sp_data_s[burn_time_env_data_s$Watershed=="C03C",])
 adonis2(wat_south~time_fire+as.factor(RecYear), by="terms", data=burn_time_env_data_s[burn_time_env_data_s$Watershed=="C03C",])
@@ -936,12 +944,15 @@ wat_south<-vegdist(burn_time_sp_data_s[burn_time_env_data_s$Watershed=="C03A",])
 adonis2(wat_south~time_fire+as.factor(RecYear), by="terms", data=burn_time_env_data_s[burn_time_env_data_s$Watershed=="C03A",])
 wat_south<-vegdist(burn_time_sp_data_s[burn_time_env_data_s$Watershed=="C03B",])
 adonis2(wat_south~time_fire+as.factor(RecYear), by="terms", data=burn_time_env_data_s[burn_time_env_data_s$Watershed=="C03B",])
-
+#time since fire differences
 permanova_north<-adonis2(dist_north~burn_time_env_data_n$time_fire+burn_time_env_data_n$Watershed+as.factor(burn_time_env_data_n$RecYear), by="terms")
 permanova_north
 #multiple comparisons
 pairwise.adonis2(dist_north~time_fire+Watershed+as.factor(RecYear),by="terms", data=burn_time_env_data_n)
 
+#PBG vs ABG
+permanova_fire<-adonis2(dist_north~burn_time_env_data_n$FireGrzTrt+as.factor(burn_time_env_data_n$RecYear), by="terms")
+permanova_fire
 
 ####lifeform####
 #wrangle data
@@ -1820,6 +1831,11 @@ g_permanova_south
 #multiple comparisons
 g_pairwise_south<-pairwise.adonis2(g_dist_south~time_fire+Watershed+as.factor(RecYear),by="terms", data=g_burn_time_env_data_s)
 
+#comparing ABG vs PBG 
+g_permanova_fire_s<-adonis2(g_dist_south~g_burn_time_env_data_s$FireGrzTrt+as.factor(g_burn_time_env_data_s$RecYear), by="terms")
+g_permanova_fire_s
+
+
 #comparing time since fire within each watershed to validate
 g_wat_south<-vegdist(g_burn_time_sp_data_s[g_burn_time_env_data_s$Watershed=="C03C",])
 adonis2(g_wat_south~time_fire+as.factor(RecYear), by="terms", data=g_burn_time_env_data_s[g_burn_time_env_data_s$Watershed=="C03C",])
@@ -1838,6 +1854,11 @@ g_wat_north<-vegdist(g_burn_time_sp_data_n[g_burn_time_env_data_n$Watershed=="C3
 adonis2(g_wat_north~time_fire+as.factor(RecYear), by="terms", data=g_burn_time_env_data_n[g_burn_time_env_data_n$Watershed=="C3SB",])
 g_wat_north<-vegdist(g_burn_time_sp_data_n[g_burn_time_env_data_n$Watershed=="C3SC",])
 adonis2(g_wat_north~time_fire+as.factor(RecYear), by="terms", data=g_burn_time_env_data_n[g_burn_time_env_data_n$Watershed=="C3SC",])
+
+#comparing ABG vs PBG
+g_permanova_fire_north<-adonis2(g_dist_north~g_burn_time_env_data_n$FireGrzTrt+as.factor(g_burn_time_env_data_n$RecYear), by="terms")
+g_permanova_fire_north
+
 
 ####lifeform####
 #wrangle data
