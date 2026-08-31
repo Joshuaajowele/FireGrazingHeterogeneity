@@ -474,7 +474,7 @@ sd_spat_viz<-ggplot(combo_spat_biom[combo_spat_biom$variab=="SD",],aes(FireGrzTr
   geom_errorbar(aes(ymin=biom_avg-biom_se,
                     ymax=biom_avg+biom_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Plant Biomass SD (gm"^-2*")"))+
+  ylab(label=expression("Heterogeneity (gm"^-2*")"))+
   xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
@@ -842,7 +842,7 @@ pl_beta_avg_fig<-ggplot(pl_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt)
   geom_errorbar(aes(ymin=b_lower,
                     ymax=b_upp),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Betadiversity"))+
+  ylab(label=expression("Heterogeneity"))+
   xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
@@ -1068,7 +1068,7 @@ anova(pg_l)
 
 
 #visual
-ggplot(pl_comp_life[pl_comp_life$life_form=="p_w",], aes(RecYear, rel_abund, col=FireGrzTrt))+
+woody_reg_viz<-ggplot(pl_comp_life[pl_comp_life$life_form=="p_w",], aes(RecYear, rel_abund, col=FireGrzTrt))+
   geom_point(size=3)+
   geom_smooth(method="lm", aes(as.numeric(RecYear)))+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
@@ -1388,7 +1388,7 @@ g_sd_spat_viz<-ggplot(combo_spat_gcount[combo_spat_gcount$variab=="SD",],aes(Fir
   geom_errorbar(aes(ymin=gcount_avg-c_se,
                     ymax=gcount_avg+c_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Grasshopper SD"))+
+  ylab(label=expression("Heterogeneity"))+
   xlab(labe=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
@@ -1736,7 +1736,7 @@ g_beta_avg_fig<-ggplot(g_beta_viz_avg,aes(FireGrzTrt, beta_avg,col=FireGrzTrt))+
   geom_errorbar(aes(ymin=b_lower,
                     ymax=b_upp),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Grasshopper betadiversity"))+
+  ylab(label=expression("Heterogeneity"))+
   xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
@@ -2184,7 +2184,7 @@ b_sd_spat_viz<-ggplot(combo_spat_bcount[combo_spat_bcount$variab=="SD",],aes(Fir
   geom_errorbar(aes(ymin=bcount_avg-c_se,
                     ymax=bcount_avg+c_se),width=0.0125)+
   scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Bird SD"))+
+  ylab(label=expression("Heterogeneity"))+
   xlab(labe=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
@@ -2637,7 +2637,7 @@ b_rich_grp_com<-ggplot(b_rich_grp_combo,aes(time_fire, rich,fill=group))+
                     ymax=r_upp),width=0.0125)+
   scale_fill_manual(values=c(  "#0072B2","#999999", "#0072B2"))+
   ylab(label=expression("Bird richness"))+
-  xlab(label="Year since last fire")+
+  xlab(label=NULL)+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
@@ -2659,39 +2659,54 @@ b_t_fire_g_obligate_fig<-ggplot(g_oblig_viz,aes(time_fire, rich,col=time_fire))+
   )
 
 
-###need to compare absolute abundance based on grasshopper and bird groups???
+
 #All figures####
+#Fig2: structural and compoistional heterogeneity
+plant_hetero<-sd_spat_viz/pl_beta_avg_fig&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+gh_hetero<-g_sd_spat_viz/g_beta_avg_fig&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+plant_hetero-gh_hetero+b_sd_spat_viz/b_sd_spat_viz&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+#fig3: abundane and compoistion
+pl_abund<-t_fire_biom_avg_fig+g_t_fire_c_avg_fig+b_t_fire_c_avg_fig&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+woody_combo<-woody_reg_viz+woody_reg_viz
+pl_abund/nmds_firegrztrt/woody_combo&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
+#Fig 4: species richness and evenness
+pl_rich_even<-rich_past_fig/evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+gh_rich_even<-g_rich_past_fig/g_evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+pl_rich_even-gh_rich_even+b_div_timefire+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
+#other combinations mostly exploratory
 #combine the transect temporal change abundance
-biomass_temp_viz-g_temp_viz+b_temp_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-#combine spatial change 
-biomass_spatial_viz-g_spatial_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-#combine spatial change average
-bioma_spatial_avg_viz-g_spat_avg_viz+bird_spatial_avg_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-
-#combine temporal change
-avg_chang_viz-g_avg_chang_viz+b_avg_chang_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-#combine diversity and beta
-pl_diver_fig=pl_beta_avg_fig/rich_past_fig/evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-g_diver_fig=g_beta_avg_fig/g_rich_past_fig/g_evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-pl_diver_fig-g_diver_fig+b_div_timefire+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-#combine diversity and beta showing each year
-pl_beta_fig+g_beta_fig
-#combine NMDS
-pl_nmds_fig=pl_t_s/pl_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
-g_nmds_fig=g_t_s/g_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
-pl_nmds_fig-g_nmds_fig+b_t_s/b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-
-
-#combine nmds based on firegrztrt
-
-nmds_firegrztrt<-pl_fire_viz+g_fire_viz+b_fire_viz+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
-
-#combine groups
-Pl_group+g_group+b_group_tf+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
-b_rich_grp_com
-firgrzt_grp=Pl_group+g_group+b_group+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-#
-nmds_firegrztrt/firgrzt_grp&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+# biomass_temp_viz-g_temp_viz+b_temp_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# #combine spatial change 
+# biomass_spatial_viz-g_spatial_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# #combine spatial change average
+# bioma_spatial_avg_viz-g_spat_avg_viz+bird_spatial_avg_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# 
+# #combine temporal change
+# avg_chang_viz-g_avg_chang_viz+b_avg_chang_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# #combine diversity and beta
+# pl_diver_fig=pl_beta_avg_fig/rich_past_fig/evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# g_diver_fig=g_beta_avg_fig/g_rich_past_fig/g_evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# pl_diver_fig-g_diver_fig+b_div_timefire+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# #combine diversity and beta showing each year
+# pl_beta_fig+g_beta_fig
+# #combine NMDS
+# pl_nmds_fig=pl_t_s/pl_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+# g_nmds_fig=g_t_s/g_t_n+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+# pl_nmds_fig-g_nmds_fig+b_t_s/b_t_s+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# 
+# 
+# #combine nmds based on firegrztrt
+# 
+# nmds_firegrztrt<-pl_fire_viz+g_fire_viz+b_fire_viz+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+# 
+# #combine groups
+# Pl_group+g_group+b_group_tf+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+# b_rich_grp_com
+# firgrzt_grp=Pl_group+g_group+b_group+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# #
+# nmds_firegrztrt/firgrzt_grp&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
 
 #Precipitation and Temperature data####
 ppt_data$ppt=as.numeric(ppt_data$ppt)
