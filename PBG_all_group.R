@@ -1,6 +1,8 @@
 #Author: Joshua Ajowele####
-#This script is for plant biomass and species composition response to fire and grazing heterogeneity
-#Date: Feb 6, 2026 Last modified: June 16, 2026
+#email: joshuaajowele@gmail.com
+#This script is for data wrangling, analyses and visualization for the manscript
+#Ecological effects of patch-burn grazing vary across trophic groups in tallgrass prairie
+#Date: Feb 6, 2026 Last modified: Oct. 6, 2026
 
 #Load library####
 library(tidyverse)
