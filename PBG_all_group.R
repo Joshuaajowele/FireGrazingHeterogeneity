@@ -1111,26 +1111,26 @@ woody_reg_viz<-ggplot(pl_comp_life[pl_comp_life$life_form=="p_w",], aes(RecYear,
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
-ggplot(pl_comp_life[pl_comp_life$life_form=="p_f",], aes(RecYear, rel_abund, col=FireGrzTrt))+
-  geom_point(size=3)+
-  geom_smooth(method="lm", aes(as.numeric(RecYear)))+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label="Relative abundance of perennial forb")+
-  xlab(label="Year")+
-  theme_bw()+
-  theme(panel.grid.major = element_blank(),  # Remove major gridlines
-        panel.grid.minor = element_blank()   # Remove minor gridlines
-  )
-ggplot(pl_comp_life[pl_comp_life$life_form=="p_g",], aes(RecYear, rel_abund, col=FireGrzTrt))+
-  geom_point(size=3)+
-  geom_smooth(method="lm", aes(as.numeric(RecYear)))+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label="Relative abundance of perennial gramminoid")+
-  xlab(label="Year")+
-  theme_bw()+
-  theme(panel.grid.major = element_blank(),  # Remove major gridlines
-        panel.grid.minor = element_blank()   # Remove minor gridlines
-  )
+# ggplot(pl_comp_life[pl_comp_life$life_form=="p_f",], aes(RecYear, rel_abund, col=FireGrzTrt))+
+#   geom_point(size=3)+
+#   geom_smooth(method="lm", aes(as.numeric(RecYear)))+
+#   scale_color_manual(values=c( "#F0E442", "#009E73"))+
+#   ylab(label="Relative abundance of perennial forb")+
+#   xlab(label="Year")+
+#   theme_bw()+
+#   theme(panel.grid.major = element_blank(),  # Remove major gridlines
+#         panel.grid.minor = element_blank()   # Remove minor gridlines
+#   )
+# ggplot(pl_comp_life[pl_comp_life$life_form=="p_g",], aes(RecYear, rel_abund, col=FireGrzTrt))+
+#   geom_point(size=3)+
+#   geom_smooth(method="lm", aes(as.numeric(RecYear)))+
+#   scale_color_manual(values=c( "#F0E442", "#009E73"))+
+#   ylab(label="Relative abundance of perennial gramminoid")+
+#   xlab(label="Year")+
+#   theme_bw()+
+#   theme(panel.grid.major = element_blank(),  # Remove major gridlines
+#         panel.grid.minor = element_blank()   # Remove minor gridlines
+#   )
 
 #GRASSHOPPER####
 #wrangle data
