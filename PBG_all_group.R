@@ -1,8 +1,8 @@
 #Author: Joshua Ajowele####
 #email: joshuaajowele@gmail.com
-#This script is for data wrangling, analyses and visualization for the manscript
+#This script is for data wrangling, analyses and visualization for the manuscript
 #Ecological effects of patch-burn grazing vary across trophic groups in tallgrass prairie
-#Date: Feb 6, 2026 Last modified: Oct. 6, 2026
+#Date: Feb 6, 2026 Last modified: Nov. 3, 2026
 
 #Load library####
 library(tidyverse)
@@ -65,7 +65,7 @@ PBG_bird_C1A<-read_excel("Data_PBG_species/Qy_ExportPBGSurveyData_C1A_Apr2023.xl
   filter(Year%in%2011:2021)
 PBG_bird_updated<-read_excel("Data_PBG_species/Qy_ExportPBGSurveyData_Feb2026.xlsx")
 unique(PBG_bird_C1A$Year)
-#2019 data is missing for C1A-talk to Alice
+#No bird sampling in 2019
 PBG_bird_class<-read_excel("Data_PBG_species/KNZSpecies.xlsx")
 #precipitation and temperature data
 ppt_data<-read.csv("Data_PBG_species/APT011.csv")
@@ -262,7 +262,15 @@ check_model(temp_sd_m)
 temp_cv_m<-lmer(log(temp_biom_cv)~FireGrzTrt+(1|Unit), data=temp_biomdata[temp_biomdata$temp_biom_cv<1,])
 check_model(temp_cv_m)
 anova(temp_cv_m)
-
+#wrangle data for biomass at transect scale with year
+# biom_transect<-biomass_ready%>%
+#   group_by(Unit, Recyear, Watershed, FireGrzTrt, Transect)%>%
+#   summarise(temp_biom=mean(biomass, na.rm=T))
+# #Transect scale biomass analysis ####
+# temp_mean_m<-lmer(log(temp_biom)~FireGrzTrt*as.factor(Recyear)+(1|Unit/Watershed), data=biom_transect[biom_transect$temp_biom<2500,])
+# check_model(temp_mean_m)
+# anova(temp_mean_m)
+# testInteractions(temp_mean_m, pairwise = "FireGrzTrt", fixed= "as.factor(Recyear)")
 ###visuals####
 TBM<-interactionMeans(temp_mean_m)%>%
   mutate(resp="biomass_mean")
@@ -310,7 +318,7 @@ TBCV_viz<-ggplot(temp_biom_vizdata[temp_biom_vizdata$resp=="biomass_cv",],aes(Fi
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
 
-###combine figures####
+###combine figures for temporal averages####
 biomass_temp_viz<-TBM_viz/TBSD_viz/TBCV_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
 
@@ -329,6 +337,7 @@ t_biom_m<-lmer(log(biomass)~time_fire*Recyear+(1|Unit/Watershed), data=biom_t_fi
 check_model(t_biom_m)
 anova(t_biom_m)
 testInteractions(t_biom_m,pairwise = "time_fire")
+
 ####visual####
 t_biom_mean<-interactionMeans(t_biom_m)%>%
   mutate(biomass=exp(`adjusted mean`),
@@ -579,76 +588,76 @@ avg_chang_viz<-ggplot(comp_change_mean,aes(FireGrzTrt, comp_chang,col=FireGrzTrt
 
 ##Spatial plant comp####
 ###transect scale diversity####
-pl_rich_trsct <- community_structure(pl_species_comp, time.var = "RecYear", 
-                               abundance.var = "rel_abund",
-                               replicate.var = "rep_id", metric = "Evar")
-#combine with treatmnet info
-rich_trsct<-pl_species_comp%>%
-  ungroup()%>%
-  select(RecYear, Unit, Watershed, Transect, FireGrzTrt, rep_id)%>%
-  distinct()%>%
-  left_join(pl_rich_trsct, by=c("RecYear","rep_id"))
-
-####analysis####
-#convert to factors for analysis
-rich_trsct$RecYear<-as.factor(rich_trsct$RecYear)
-rich_trsct$Unit<-as.factor(rich_trsct$Unit)
-rich_trsct$Watershed<-as.factor(rich_trsct$Watershed)
-rich_trsct$FireGrzTrt<-as.factor(rich_trsct$FireGrzTrt)
-
-rich_trsct_m<-lmer(richness~FireGrzTrt*RecYear+(1|Unit/Watershed), data=rich_trsct)
-check_model(rich_trsct_m)
-anova(rich_trsct_m)
-testInteractions(rich_trsct_m, pairwise = "FireGrzTrt", fixed="RecYear")
-
-even_trsct_m<-lmer(Evar~FireGrzTrt*RecYear+(1|Unit/Watershed), data=rich_trsct)
-check_model(even_trsct_m)
-anova(even_trsct_m)
+# pl_rich_trsct <- community_structure(pl_species_comp, time.var = "RecYear",
+#                                abundance.var = "rel_abund",
+#                                replicate.var = "rep_id", metric = "Evar")
+# #combine with treatmnet info
+# rich_trsct<-pl_species_comp%>%
+#   ungroup()%>%
+#   select(RecYear, Unit, Watershed, Transect, FireGrzTrt, rep_id)%>%
+#   distinct()%>%
+#   left_join(pl_rich_trsct, by=c("RecYear","rep_id"))
+# 
+# ####analysis####
+# #convert to factors for analysis
+# rich_trsct$RecYear<-as.factor(rich_trsct$RecYear)
+# rich_trsct$Unit<-as.factor(rich_trsct$Unit)
+# rich_trsct$Watershed<-as.factor(rich_trsct$Watershed)
+# rich_trsct$FireGrzTrt<-as.factor(rich_trsct$FireGrzTrt)
+# 
+# rich_trsct_m<-lmer(richness~FireGrzTrt*RecYear+(1|Unit/Watershed), data=rich_trsct)
+# check_model(rich_trsct_m)
+# anova(rich_trsct_m)
+# testInteractions(rich_trsct_m, pairwise = "FireGrzTrt", fixed="RecYear")
+# 
+# even_trsct_m<-lmer(Evar~FireGrzTrt*RecYear+(1|Unit/Watershed), data=rich_trsct)
+# check_model(even_trsct_m)
+# anova(even_trsct_m)
 
 
 #####visuals#####
 #wrangle data from model
-rich_t<-interactionMeans(rich_trsct_m)%>%
-  mutate(rich =`adjusted mean`,
-         r_up=`adjusted mean`+`SE of link`,
-         r_low=`adjusted mean`-`SE of link`)
-
-rich_trsct_fig<-ggplot(rich_t,aes(RecYear, rich,col=FireGrzTrt))+
-  geom_point(size=5)+
-  geom_path(aes(as.numeric(RecYear)))+
-  geom_errorbar(aes(ymin=r_low,
-                    ymax=r_up),width=0.0125)+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Richness"))+
-  xlab(label="Year")+
-  theme_bw()+
-  theme(panel.grid.major = element_blank(),  # Remove major gridlines
-        panel.grid.minor = element_blank()   # Remove minor gridlines
-  )
+# rich_t<-interactionMeans(rich_trsct_m)%>%
+#   mutate(rich =`adjusted mean`,
+#          r_up=`adjusted mean`+`SE of link`,
+#          r_low=`adjusted mean`-`SE of link`)
+# 
+# rich_trsct_fig<-ggplot(rich_t,aes(RecYear, rich,col=FireGrzTrt))+
+#   geom_point(size=5)+
+#   geom_path(aes(as.numeric(RecYear)))+
+#   geom_errorbar(aes(ymin=r_low,
+#                     ymax=r_up),width=0.0125)+
+#   scale_color_manual(values=c( "#F0E442", "#009E73"))+
+#   ylab(label=expression("Richness"))+
+#   xlab(label="Year")+
+#   theme_bw()+
+#   theme(panel.grid.major = element_blank(),  # Remove major gridlines
+#         panel.grid.minor = element_blank()   # Remove minor gridlines
+#   )
 ####time_fire transect####
-rich_t_fire_tst<-pl_species_comp%>%
-  ungroup()%>%
-  select(RecYear, Unit, Watershed, Transect, time_fire, rep_id)%>%
-  distinct()%>%
-  left_join(pl_rich_trsct, by=c("RecYear","rep_id"))
-
-####analysis####
-#convert to factors for analysis
-rich_t_fire_tst$RecYear<-as.factor(rich_t_fire_tst$RecYear)
-rich_t_fire_tst$Unit<-as.factor(rich_t_fire_tst$Unit)
-rich_t_fire_tst$Watershed<-as.factor(rich_t_fire_tst$Watershed)
-rich_t_fire_tst$time_fire<-as.factor(rich_t_fire_tst$time_fire)
-
-rich_t_fire_tst_m<-lmer(richness~time_fire*RecYear+(1|Unit/Watershed), data=rich_t_fire_tst)
-check_model(rich_t_fire_tst_m)
-anova(rich_t_fire_tst_m)
-
-even_t_fire_tst_m<-lmer(Evar~time_fire*RecYear+(1|Unit/Watershed), data=rich_t_fire_tst)
-check_model(even_t_fire_tst_m)
-anova(even_t_fire_tst_m)
-testInteractions(even_t_fire_tst_m, pairwise="time_fire")
-ggplot(rich_t_fire_tst, aes(RecYear, richness, col=time_fire))+
-  geom_boxplot()
+# rich_t_fire_tst<-pl_species_comp%>%
+#   ungroup()%>%
+#   select(RecYear, Unit, Watershed, Transect, time_fire, rep_id)%>%
+#   distinct()%>%
+#   left_join(pl_rich_trsct, by=c("RecYear","rep_id"))
+# 
+# ####analysis####
+# #convert to factors for analysis
+# rich_t_fire_tst$RecYear<-as.factor(rich_t_fire_tst$RecYear)
+# rich_t_fire_tst$Unit<-as.factor(rich_t_fire_tst$Unit)
+# rich_t_fire_tst$Watershed<-as.factor(rich_t_fire_tst$Watershed)
+# rich_t_fire_tst$time_fire<-as.factor(rich_t_fire_tst$time_fire)
+# 
+# rich_t_fire_tst_m<-lmer(richness~time_fire*RecYear+(1|Unit/Watershed), data=rich_t_fire_tst)
+# check_model(rich_t_fire_tst_m)
+# anova(rich_t_fire_tst_m)
+# 
+# even_t_fire_tst_m<-lmer(Evar~time_fire*RecYear+(1|Unit/Watershed), data=rich_t_fire_tst)
+# check_model(even_t_fire_tst_m)
+# anova(even_t_fire_tst_m)
+# testInteractions(even_t_fire_tst_m, pairwise="time_fire")
+# ggplot(rich_t_fire_tst, aes(RecYear, richness, col=time_fire))+
+#   geom_boxplot()
 
 ###pasture scale####
 ####selecting PBG samples covering similar area as ABG####
@@ -809,10 +818,14 @@ for(YEAR in 1:length(year_vec_pl)){
 #write.csv(pl_perm_unit, "Data_PBG_species/plant_perm_sep_unit.csv")
 #pl_beta_unit<-read_csv("Data_PBG_species/plant_beta_sep_unit.csv")
 #####analysis####
-pl_beta_unit$FireGrzTrt=as.factor(pl_beta_unit$FireGrzTrt)
-pl_beta_unit$Unit=as.factor(pl_beta_unit$Unit)
-pl_beta_unit$RecYear=as.factor(pl_beta_unit$RecYear)
-pl_beta_m<-lmer(distance~FireGrzTrt*RecYear+(1|Unit), data=pl_beta_unit)
+#average values for each unit
+pl_beta_unit_avg<-pl_beta_unit%>%
+  group_by(RecYear, Unit, FireGrzTrt)%>%
+  summarise(distance=mean(distance, na.rm=T))
+pl_beta_unit_avg$FireGrzTrt=as.factor(pl_beta_unit_avg$FireGrzTrt)
+pl_beta_unit_avg$Unit=as.factor(pl_beta_unit_avg$Unit)
+pl_beta_unit_avg$RecYear=as.factor(pl_beta_unit_avg$RecYear)
+pl_beta_m<-lmer(distance~FireGrzTrt*RecYear+(1|Unit), data=pl_beta_unit_avg)
 check_model(pl_beta_m)
 anova(pl_beta_m)
 testInteractions(pl_beta_m, pairwise = "FireGrzTrt", fixed="RecYear")
@@ -939,7 +952,7 @@ pairwise_south<-pairwise.adonis2(dist_south~time_fire+Watershed+as.factor(RecYea
 permanova_fire_s<-adonis2(dist_south~burn_time_env_data_s$FireGrzTrt+as.factor(burn_time_env_data_s$RecYear), by="terms")
 permanova_fire_s
 
-#comparing time since fire within each watershed to validate
+#comparing time since fire within each watershed to validate-no diff should be expected!
 wat_south<-vegdist(burn_time_sp_data_s[burn_time_env_data_s$Watershed=="C03C",])
 adonis2(wat_south~time_fire+as.factor(RecYear), by="terms", data=burn_time_env_data_s[burn_time_env_data_s$Watershed=="C03C",])
 wat_south<-vegdist(burn_time_sp_data_s[burn_time_env_data_s$Watershed=="C03A",])
@@ -1025,6 +1038,20 @@ group_data<-pgrass_data%>%
                                                           TRUE~upper),
          grp_lower=case_when(group=="A.gram"~(lower)^2,
                                                TRUE~lower))
+###perennial gramminiod figure with year interaction####
+pgram_path_fig<-ggplot(group_data[group_data$group=="P.gram",],aes(RecYear, grp_mean,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=lower,
+                    ymax=upper),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Relative abundance of Perennial graminoid"))+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
 grp_data_ready<-group_data%>%
   group_by(group, FireGrzTrt)%>%
   summarise(grp_m=mean(grp_mean, na.rm=T),
@@ -1059,6 +1086,10 @@ woody_l<-lm(log(rel_abund)~FireGrzTrt*as.numeric(RecYear),data=pl_comp_life[pl_c
 anova(woody_l)
 check_model(woody_l)
 summary(woody_l)#0.25-Adjsuted r square
+
+# woody_lmr<-lmer(rel_abund~FireGrzTrt*as.numeric(RecYear)+(1|Unit), data=pl_comp_life[pl_comp_life$life_form=="p_w",])
+# summary(woody_lmr)
+# anova(woody_lmr)
 #perennial forbs
 pf_l<-lm(log(rel_abund)~FireGrzTrt*as.numeric(RecYear),data=pl_comp_life[pl_comp_life$life_form=="p_f",])
 summary(pf_l)
