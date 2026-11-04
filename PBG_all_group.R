@@ -2,7 +2,7 @@
 #email: joshuaajowele@gmail.com
 #This script is for data wrangling, analyses and visualization for the manuscript
 #Ecological effects of patch-burn grazing vary across trophic groups in tallgrass prairie
-#Date: Feb 6, 2026 Last modified: Nov. 3, 2026
+#Date: Feb 6, 2026 Last modified: Nov. 4, 2026
 
 #Load library####
 library(tidyverse)
@@ -1160,17 +1160,37 @@ species_list<-unique(grasshopperspcomp_df$Species)%>%
 species_list<-unique(grasshopperspcomp_df$Species[grasshopperspcomp_df$Recyear>=2022])%>%
   tibble()
 #merging key with dataset and removing katydid, etc
+#masking this series of code as it uses the max count of eachh species 
+#from the two sampling period in each season
+# grassh_count_df <- grasshopperspcomp_df%>%
+#   left_join(watershed_key, by = "Watershed")%>%
+#   mutate(RecYear = Recyear)%>%
+#   filter(!Species%in%c("Oecanthinae spp.","Tettigoniidae spp.","Gryllidae spp.",
+#                    "Conocephalus spp.","Neoconocephalus robustus","Scudderia texensis",
+#                    "Arethaea constricta","Orchelimum spp.","Amblycorypha oblongifolia","Pediodectes haldemani",
+#                    "Amblycorypha rotundifolia","Neoconocephalus spp.","Neoconocephalus ensiger","Pediodectes nigromarginatus",
+#                    "Scudderia furcata","Scudderia spp."))%>%
+#   #using the max cover from the two sweeps done on each transect
+#   group_by(Unit,RecYear,FireGrzTrt,Watershed,Repsite,Species)%>%
+#   summarise(Total=max(Total))%>%
+#   group_by(Unit,RecYear,FireGrzTrt,Watershed,Repsite)%>%
+#   #calculate total count per repsite
+#   summarise(Tcount=sum(Total, na.rm=T))%>%
+#   ungroup()
+
+#merging key with dataset and removing katydid, etc
 grassh_count_df <- grasshopperspcomp_df%>%
   left_join(watershed_key, by = "Watershed")%>%
   mutate(RecYear = Recyear)%>%
   filter(!Species%in%c("Oecanthinae spp.","Tettigoniidae spp.","Gryllidae spp.",
-                   "Conocephalus spp.","Neoconocephalus robustus","Scudderia texensis",
-                   "Arethaea constricta","Orchelimum spp.","Amblycorypha oblongifolia","Pediodectes haldemani",
-                   "Amblycorypha rotundifolia","Neoconocephalus spp.","Neoconocephalus ensiger","Pediodectes nigromarginatus",
-                   "Scudderia furcata","Scudderia spp."))%>%
+                       "Conocephalus spp.","Neoconocephalus robustus","Scudderia texensis",
+                       "Arethaea constricta","Orchelimum spp.","Amblycorypha oblongifolia","Pediodectes haldemani",
+                       "Amblycorypha rotundifolia","Neoconocephalus spp.","Neoconocephalus ensiger","Pediodectes nigromarginatus",
+                       "Scudderia furcata","Scudderia spp."))%>%
   #using the max cover from the two sweeps done on each transect
   group_by(Unit,RecYear,FireGrzTrt,Watershed,Repsite,Species)%>%
-  summarise(Total=max(Total))%>%
+  #using average of the two sampling efforts in each year
+  summarise(Total=mean(Total, na.rm=T))%>%
   group_by(Unit,RecYear,FireGrzTrt,Watershed,Repsite)%>%
   #calculate total count per repsite
   summarise(Tcount=sum(Total, na.rm=T))%>%
@@ -1286,7 +1306,7 @@ g_t_count_mean<-interactionMeans(g_t_count_m)%>%
   mutate(count_m=exp(`adjusted mean`),
          count_up=exp(`adjusted mean`+`SE of link`),
          count_low=exp(`adjusted mean`-`SE of link`))
-
+###Time series figure grasshopper abundance yeer since last fire####
 g_t_fire_count_fig<-ggplot(g_t_count_mean,aes(RecYear, count_m,col=time_fire))+
   geom_point(size=5)+
   geom_path(aes(as.numeric(RecYear)))+
@@ -1326,10 +1346,10 @@ g_spat_cdata$Unit=as.factor(g_spat_cdata$Unit)
 g_spat_cdata$FireGrzTrt=as.factor(g_spat_cdata$FireGrzTrt)
 g_spat_cdata$RecYear=as.factor(g_spat_cdata$RecYear)
 #analysis
-g_spat_c_m<-lmer(spat_c~FireGrzTrt*RecYear+(1|Unit), data=g_spat_cdata)
+g_spat_c_m<-lmer(log(spat_c)~FireGrzTrt*RecYear+(1|Unit), data=g_spat_cdata)
 check_model(g_spat_c_m)
 anova(g_spat_c_m)
-testInteractions(g_spat_c_m, pairwise = "FireGrzTrt", fixed="RecYear")
+
 #SD
 g_spat_c_sd<-lmer(log(spat_c_sd)~FireGrzTrt*RecYear+(1|Unit), data=g_spat_cdata)
 check_model(g_spat_c_sd)
@@ -1341,9 +1361,9 @@ anova(g_spat_c_cv)
 testInteractions(g_spat_c_cv,pairwise = "FireGrzTrt")
 ##visuals####
 gcount_mean<-interactionMeans(g_spat_c_m)%>%
-  mutate(count_m=(`adjusted mean`),
-         c_up=(`adjusted mean`+`SE of link`),
-         c_low=(`adjusted mean`-`SE of link`),
+  mutate(count_m=exp(`adjusted mean`),
+         c_up=exp(`adjusted mean`+`SE of link`),
+         c_low=exp(`adjusted mean`-`SE of link`),
          variab="AVG")
 
 count_mean_fig<-ggplot(gcount_mean,aes(RecYear, count_m,col=FireGrzTrt))+
@@ -1444,6 +1464,7 @@ g_spat_avg_viz=g_t_fire_c_avg_fig/g_sd_spat_viz+g_cv_spat_viz+ plot_layout(guide
 
 #G composition#####
 #merging key with dataset and removing katydid, etc
+#merging key with dataset and removing katydid, etc
 grassh_comm_df <- grasshopperspcomp_df%>%
   left_join(watershed_key, by = "Watershed")%>%
   mutate(RecYear = Recyear)%>%
@@ -1452,9 +1473,24 @@ grassh_comm_df <- grasshopperspcomp_df%>%
                        "Arethaea constricta","Orchelimum spp.","Amblycorypha oblongifolia","Pediodectes haldemani",
                        "Amblycorypha rotundifolia","Neoconocephalus spp.","Neoconocephalus ensiger","Pediodectes nigromarginatus",
                        "Scudderia furcata","Scudderia spp."))%>%
-  #using the max count from the two diff survey done on each transect
+  #using the average count from the two diff survey done on each transect
   group_by(Unit,RecYear,FireGrzTrt,Watershed,Repsite,Species)%>%
-  summarise(gcount=max(Total))
+  summarise(gcount=mean(Total, na.rm=T))
+
+#using the maximum count of the two sampling effort within each season
+# grassh_comm_df <- grasshopperspcomp_df%>%
+#   left_join(watershed_key, by = "Watershed")%>%
+#   mutate(RecYear = Recyear)%>%
+#   filter(!Species%in%c("Oecanthinae spp.","Tettigoniidae spp.","Gryllidae spp.",
+#                        "Conocephalus spp.","Neoconocephalus robustus","Scudderia texensis",
+#                        "Arethaea constricta","Orchelimum spp.","Amblycorypha oblongifolia","Pediodectes haldemani",
+#                        "Amblycorypha rotundifolia","Neoconocephalus spp.","Neoconocephalus ensiger","Pediodectes nigromarginatus",
+#                        "Scudderia furcata","Scudderia spp."))%>%
+#   #using the max count from the two diff survey done on each transect
+#   group_by(Unit,RecYear,FireGrzTrt,Watershed,Repsite,Species)%>%
+#   summarise(gcount=max(Total))
+
+#relative abundance per transect
 grassh_tcomm_df<-grassh_comm_df%>%
   group_by(Unit, FireGrzTrt,Watershed, RecYear,Repsite)%>%
   mutate(total_count=sum(gcount))%>%
@@ -1462,6 +1498,7 @@ grassh_tcomm_df<-grassh_comm_df%>%
   mutate(rel_abund=gcount/total_count)%>%
   mutate(rep_id=paste(Unit, Watershed, FireGrzTrt, Repsite, sep="_"),
          wsd_rep=paste(Watershed,Repsite, sep="_"))
+
 
 ##community change calculation yearly in each transect####
 g_time_change<-multivariate_change(grassh_tcomm_df, species.var="Species",
@@ -1521,40 +1558,40 @@ g_rich_trsct<-grassh_tcomm_df%>%
 
 ####analysis####
 #convert to factors for analysis
-g_rich_trsct$RecYear<-as.factor(g_rich_trsct$RecYear)
-g_rich_trsct$Unit<-as.factor(g_rich_trsct$Unit)
-g_rich_trsct$Watershed<-as.factor(g_rich_trsct$Watershed)
-g_rich_trsct$FireGrzTrt<-as.factor(g_rich_trsct$FireGrzTrt)
-
-g_rich_trsct_m<-lmer(richness~FireGrzTrt*RecYear+(1|Unit/Watershed), data=g_rich_trsct)
-check_model(g_rich_trsct_m)
-anova(g_rich_trsct_m)
-testInteractions(g_rich_trsct_m, pairwise = "FireGrzTrt")
-
-g_even_trsct_m<-lmer(Evar~FireGrzTrt*RecYear+(1|Unit/Watershed), data=g_rich_trsct)
-check_model(g_even_trsct_m)
-anova(g_even_trsct_m)
-testInteractions(g_even_trsct_m, pairwise = "FireGrzTrt")
-
-#####visuals#####
-#wrangle data from model
-g_rich_t<-interactionMeans(g_rich_trsct_m)%>%
-  mutate(rich =`adjusted mean`,
-         r_up=`adjusted mean`+`SE of link`,
-         r_low=`adjusted mean`-`SE of link`)
-
-g_rich_trsct_fig<-ggplot(g_rich_t,aes(RecYear, rich,col=FireGrzTrt))+
-  geom_point(size=5)+
-  geom_path(aes(as.numeric(RecYear)))+
-  geom_errorbar(aes(ymin=r_low,
-                    ymax=r_up),width=0.0125)+
-  scale_color_manual(values=c( "#F0E442", "#009E73"))+
-  ylab(label=expression("Grasshopper richness"))+
-  xlab(label="Year")+
-  theme_bw()+
-  theme(panel.grid.major = element_blank(),  # Remove major gridlines
-        panel.grid.minor = element_blank()   # Remove minor gridlines
-  )
+# g_rich_trsct$RecYear<-as.factor(g_rich_trsct$RecYear)
+# g_rich_trsct$Unit<-as.factor(g_rich_trsct$Unit)
+# g_rich_trsct$Watershed<-as.factor(g_rich_trsct$Watershed)
+# g_rich_trsct$FireGrzTrt<-as.factor(g_rich_trsct$FireGrzTrt)
+# 
+# g_rich_trsct_m<-lmer(richness~FireGrzTrt*RecYear+(1|Unit/Watershed), data=g_rich_trsct)
+# check_model(g_rich_trsct_m)
+# anova(g_rich_trsct_m)
+# testInteractions(g_rich_trsct_m, pairwise = "FireGrzTrt")
+# 
+# g_even_trsct_m<-lmer(Evar~FireGrzTrt*RecYear+(1|Unit/Watershed), data=g_rich_trsct)
+# check_model(g_even_trsct_m)
+# anova(g_even_trsct_m)
+# testInteractions(g_even_trsct_m, pairwise = "FireGrzTrt")
+# 
+# #####visuals#####
+# #wrangle data from model
+# g_rich_t<-interactionMeans(g_rich_trsct_m)%>%
+#   mutate(rich =`adjusted mean`,
+#          r_up=`adjusted mean`+`SE of link`,
+#          r_low=`adjusted mean`-`SE of link`)
+# 
+# g_rich_trsct_fig<-ggplot(g_rich_t,aes(RecYear, rich,col=FireGrzTrt))+
+#   geom_point(size=5)+
+#   geom_path(aes(as.numeric(RecYear)))+
+#   geom_errorbar(aes(ymin=r_low,
+#                     ymax=r_up),width=0.0125)+
+#   scale_color_manual(values=c( "#F0E442", "#009E73"))+
+#   ylab(label=expression("Grasshopper richness"))+
+#   xlab(label="Year")+
+#   theme_bw()+
+#   theme(panel.grid.major = element_blank(),  # Remove major gridlines
+#         panel.grid.minor = element_blank()   # Remove minor gridlines
+#   )
 ####time_fire transect####
 grassh_tcomm_df$RecYear<-as.factor(grassh_tcomm_df$RecYear)
 g_rich_t_fire_tst<-grassh_tcomm_df%>%
@@ -1567,25 +1604,25 @@ g_rich_t_fire_tst<-grassh_tcomm_df%>%
 
 ####analysis####
 #convert to factors for analysis
-g_rich_t_fire_tst$Unit<-as.factor(g_rich_t_fire_tst$Unit)
-g_rich_t_fire_tst$Watershed<-as.factor(g_rich_t_fire_tst$Watershed)
-g_rich_t_fire_tst$time_fire<-as.factor(g_rich_t_fire_tst$time_fire)
-
-g_rich_t_fire_tst_m<-lmer(richness~time_fire*RecYear+(1|Unit/Watershed), data=g_rich_t_fire_tst)
-check_model(g_rich_t_fire_tst_m)
-anova(g_rich_t_fire_tst_m)
-testInteractions(g_rich_t_fire_tst_m, pairwise="time_fire", fixed="RecYear")
-testInteractions(g_rich_t_fire_tst_m, pairwise="time_fire")
-
-g_even_t_fire_tst_m<-lmer(Evar~time_fire*RecYear+(1|Unit/Watershed), data=g_rich_t_fire_tst)
-check_model(g_even_t_fire_tst_m)
-anova(g_even_t_fire_tst_m)
-testInteractions(g_even_t_fire_tst_m, pairwise="time_fire", fixed="RecYear")
-testInteractions(g_even_t_fire_tst_m, pairwise="time_fire")
-ggplot(g_rich_t_fire_tst, aes(RecYear, richness, col=time_fire))+
-  geom_boxplot()
-ggplot(g_rich_t_fire_tst, aes(RecYear, Evar, col=time_fire))+
-  geom_boxplot()
+# g_rich_t_fire_tst$Unit<-as.factor(g_rich_t_fire_tst$Unit)
+# g_rich_t_fire_tst$Watershed<-as.factor(g_rich_t_fire_tst$Watershed)
+# g_rich_t_fire_tst$time_fire<-as.factor(g_rich_t_fire_tst$time_fire)
+# 
+# g_rich_t_fire_tst_m<-lmer(richness~time_fire*RecYear+(1|Unit/Watershed), data=g_rich_t_fire_tst)
+# check_model(g_rich_t_fire_tst_m)
+# anova(g_rich_t_fire_tst_m)
+# testInteractions(g_rich_t_fire_tst_m, pairwise="time_fire", fixed="RecYear")
+# testInteractions(g_rich_t_fire_tst_m, pairwise="time_fire")
+# 
+# g_even_t_fire_tst_m<-lmer(Evar~time_fire*RecYear+(1|Unit/Watershed), data=g_rich_t_fire_tst)
+# check_model(g_even_t_fire_tst_m)
+# anova(g_even_t_fire_tst_m)
+# testInteractions(g_even_t_fire_tst_m, pairwise="time_fire", fixed="RecYear")
+# testInteractions(g_even_t_fire_tst_m, pairwise="time_fire")
+# ggplot(g_rich_t_fire_tst, aes(RecYear, richness, col=time_fire))+
+#   geom_boxplot()
+# ggplot(g_rich_t_fire_tst, aes(RecYear, Evar, col=time_fire))+
+#   geom_boxplot()
 
 ###pasture scale####
 ####selecting PBG samples covering similar area as ABG####
@@ -1734,10 +1771,14 @@ for(YEAR in 1:length(year_vec_g)){
 }
 #write.csv(g_beta_unit, "Data_PBG_species/g_beta_sep_unit.csv")
 #####analysis####
-g_beta_unit$FireGrzTrt=as.factor(g_beta_unit$FireGrzTrt)
-g_beta_unit$Unit=as.factor(g_beta_unit$Unit)
-g_beta_unit$RecYear=as.factor(g_beta_unit$RecYear)
-g_beta_m<-lmer(log(distance)~FireGrzTrt*RecYear+(1|Unit), data=g_beta_unit)
+#average distance to centroid of each transect to unit scale
+g_beta_unit_avg<-g_beta_unit%>%
+  group_by(RecYear, Unit, FireGrzTrt)%>%
+  summarise(distance=mean(distance, na.rm=T))
+g_beta_unit_avg$FireGrzTrt=as.factor(g_beta_unit_avg$FireGrzTrt)
+g_beta_unit_avg$Unit=as.factor(g_beta_unit_avg$Unit)
+g_beta_unit_avg$RecYear=as.factor(g_beta_unit_avg$RecYear)
+g_beta_m<-lmer(log(distance)~FireGrzTrt*RecYear+(1|Unit), data=g_beta_unit_avg)
 check_model(g_beta_m)
 anova(g_beta_m)
 testInteractions(g_beta_m, pairwise = "FireGrzTrt")
@@ -1940,9 +1981,20 @@ g_group_data<-gh_mix_data%>%
   mutate(grp_mean=`adjusted mean`,
            upper=(`adjusted mean`+`SE of link`),
          lower=(`adjusted mean`-`SE of link`))
-#explore
-# ggplot(g_comp_life[g_comp_life$feeding=="mix",],aes(RecYear, rel_abund, fill=FireGrzTrt))+
-#   geom_boxplot()
+#####forb feeders figure in each year####
+forb_feed_path<-ggplot(g_group_data[g_group_data$group=="Forb feeders",],aes(RecYear, grp_mean, col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_path(aes(as.numeric(RecYear)))+
+  geom_errorbar(aes(ymin=lower,
+                    ymax=upper),width=0.0125)+
+  scale_colour_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label="Relative abundance of forb feeders")+
+  xlab(label="Year")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
 g_grp_data_ready<-g_group_data%>%
   group_by(group, FireGrzTrt)%>%
   summarise(grp_m=mean(grp_mean, na.rm=T),
