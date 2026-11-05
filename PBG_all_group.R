@@ -2,7 +2,7 @@
 #email: joshuaajowele@gmail.com
 #This script is for data wrangling, analyses and visualization for the manuscript
 #Ecological effects of patch-burn grazing vary across trophic groups in tallgrass prairie
-#Date: Feb 6, 2026 Last modified: Nov. 4, 2026
+#Date: Feb 6, 2026 Last modified: Nov. 5, 2026
 
 #Load library####
 library(tidyverse)
@@ -2040,9 +2040,7 @@ transect_key<- data.frame(TransectName = levels(factor(PBG_bird_merge$TransectNa
 PBG_bird_viz<-PBG_bird_merge%>%
   left_join(watershed_bird_key, by="Watershed")%>%
   left_join(transect_key, by="TransectName")
-#check data for entry errors, 2018 C3A seems to be suspect: 
-#I think it has an extra transect that should belong to C3B-90% sure-Corrected in raw data
-#email Alice about it
+
 
 #There are multiple observation by multiple observers 2011-2016
 #or just multiple observation by one observer 2011, C3C, C1A
@@ -2162,7 +2160,7 @@ b_count_tfire$Year=as.factor(b_count_tfire$Year)
 b_count_tfire$time_fire=as.factor(b_count_tfire$time_fire)
 b_count_tfire$Watershed=as.factor(b_count_tfire$Watershed)
 #model
-b_t_count_m<-lmer(log(Tcount)~time_fire+Year+(1|Watershed), data=b_count_tfire)#since spatial sd and cv below cannot produce interaction
+b_t_count_m<-lmer(log(Tcount)~time_fire+Year+(1|Watershed), data=b_count_tfire)
 check_model(b_t_count_m)
 anova(b_t_count_m)
 testInteractions(b_t_count_m,pairwise = "time_fire", fixed="Year")
@@ -2212,6 +2210,16 @@ b_spat_cdata<-b_count_tfire%>%
 b_spat_cdata$FireGrzTrt=as.factor(b_spat_cdata$FireGrzTrt)
 b_spat_cdata$Year=as.factor(b_spat_cdata$Year)
 #analysis
+
+b_spat_c_m<-lmer(log(spat_c)~FireGrzTrt+Year+(1|FireGrzTrt), data=b_spat_cdata)#ot repeated
+# library(nlme)
+# lll<-lme(spat_c~FireGrzTrt+Year,
+#          data=b_spat_cdata,
+#          random=~1|FireGrzTrt,
+#          correlation=corCompSymm(form = ~1|FireGrzTrt)
+#          , control=lmeControl(returnObject=TRUE)
+#          , na.action = na.omit)
+# anova(lll)
 b_spat_c_m<-lm(log(spat_c)~FireGrzTrt+Year, data=b_spat_cdata)#nan returned when interaction included
 check_model(b_spat_c_m)
 anova(b_spat_c_m)
@@ -2219,6 +2227,7 @@ summary(b_spat_c_m)
 testInteractions(b_spat_c_m, pairwise = "FireGrzTrt")
 #SD
 b_spat_c_sd<-lm(spat_c_sd~FireGrzTrt+Year, data=b_spat_cdata)
+
 check_model(b_spat_c_sd)
 anova(b_spat_c_sd)
 #cv
@@ -2321,7 +2330,12 @@ b_t_change$year_diff<-as.factor(b_t_change$year_diff)
 b_t_ch_m<-lmer(composition_change~FireGrzTrt+(1|Watershed), data=b_t_change)
 check_model(b_t_ch_m)
 anova(b_t_ch_m)
-
+#similar result when repeated measure explicitly described
+# oooo<-lme(composition_change~FireGrzTrt,
+#           random=~1|Watershed,
+#           data=b_t_change,
+#           correlation = corCompSymm(form=~1|Watershed))
+# anova(oooo)
 ##visuals####
 #wrangle data from model
 b_comp_change_mean<-interactionMeans(b_t_ch_m)%>%
@@ -2390,6 +2404,51 @@ b_rich_trsct_fig<-ggplot(b_rich_t,aes(Year, rich,col=FireGrzTrt))+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank()   # Remove minor gridlines
   )
+#average
+b_rich_t_avg<-b_rich_t%>%
+  group_by(FireGrzTrt)%>%
+  summarise(richn=mean(rich, na.rm=T),
+            up=mean(r_up),
+            low=mean(r_low))
+b_rich_trsct_fig_avg<-ggplot(b_rich_t_avg,aes(FireGrzTrt, richn,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Bird richness"))+
+  xlab(label=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+
+#evenness
+b_even_t<-interactionMeans(b_even_trsct_m)%>%
+  mutate(even =`adjusted mean`,
+         r_up=`adjusted mean`+`SE of link`,
+         r_low=`adjusted mean`-`SE of link`)
+
+#average
+b_even_t_avg<-b_even_t%>%
+  group_by(FireGrzTrt)%>%
+  summarise(evenn=mean(even, na.rm=T),
+            up=mean(r_up),
+            low=mean(r_low))
+b_even_trsct_fig_avg<-ggplot(b_even_t_avg,aes(FireGrzTrt, evenn,col=FireGrzTrt))+
+  geom_point(size=5)+
+  geom_errorbar(aes(ymin=low,
+                    ymax=up),width=0.0125)+
+  scale_color_manual(values=c( "#F0E442", "#009E73"))+
+  ylab(label=expression("Bird evenness"))+
+  xlab(label=NULL)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
+##combine bird diversity figures 
+b_div_firegrzt<-b_rich_trsct_fig_avg/b_even_trsct_fig_avg+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "bottom")
+
+
 ####time_fire transect####
 b_tcomm_df$Year<-as.factor(b_tcomm_df$Year)
 b_rich_t_fire_tst<-b_tcomm_df%>%
@@ -2750,6 +2809,7 @@ b_t_fire_g_obligate_fig<-ggplot(g_oblig_viz,aes(time_fire, rich,col=time_fire))+
 plant_hetero<-sd_spat_viz/pl_beta_avg_fig&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 gh_hetero<-g_sd_spat_viz/g_beta_avg_fig&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 plant_hetero-gh_hetero+b_sd_spat_viz/b_sd_spat_viz&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+#remove bird abundance heterogeneity
 #fig3: abundane and compoistion
 pl_abund<-t_fire_biom_avg_fig+g_t_fire_c_avg_fig+b_t_fire_c_avg_fig&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 woody_combo<-woody_reg_viz+woody_reg_viz
@@ -2758,8 +2818,14 @@ pl_abund/nmds_firegrztrt/woody_combo&plot_annotation(tag_levels = "A")&theme(leg
 #Fig 4: species richness and evenness
 pl_rich_even<-rich_past_fig/evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 gh_rich_even<-g_rich_past_fig/g_evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-pl_rich_even-gh_rich_even+b_div_timefire+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+pl_rich_even-gh_rich_even+b_div_firegrzt+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
+#Fig 4: species richness and evenness old
+# pl_rich_even<-rich_past_fig/evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# gh_rich_even<-g_rich_past_fig/g_evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+# pl_rich_even-gh_rich_even+b_div_timefire+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
+b_div_firegrzt
 #other combinations mostly exploratory
 #combine the transect temporal change abundance
 # biomass_temp_viz-g_temp_viz+b_temp_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
