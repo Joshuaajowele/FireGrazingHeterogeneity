@@ -2808,8 +2808,11 @@ b_t_fire_g_obligate_fig<-ggplot(g_oblig_viz,aes(time_fire, rich,col=time_fire))+
 #Fig2: structural and compoistional heterogeneity
 plant_hetero<-sd_spat_viz/pl_beta_avg_fig&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 gh_hetero<-g_sd_spat_viz/g_beta_avg_fig&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
-plant_hetero-gh_hetero+b_sd_spat_viz/b_sd_spat_viz&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+#plant_hetero-gh_hetero+b_sd_spat_viz/b_sd_spat_viz&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 #remove bird abundance heterogeneity
+plant_hetero-gh_hetero&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
+
+
 #fig3: abundane and compoistion
 pl_abund<-t_fire_biom_avg_fig+g_t_fire_c_avg_fig+b_t_fire_c_avg_fig&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 woody_combo<-woody_reg_viz+woody_reg_viz
@@ -2825,7 +2828,6 @@ pl_rich_even-gh_rich_even+b_div_firegrzt+plot_layout(guides = "collect")&plot_an
 # gh_rich_even<-g_rich_past_fig/g_evar_past_fig+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 # pl_rich_even-gh_rich_even+b_div_timefire+plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
 
-b_div_firegrzt
 #other combinations mostly exploratory
 #combine the transect temporal change abundance
 # biomass_temp_viz-g_temp_viz+b_temp_viz+ plot_layout(guides = "collect")&plot_annotation(tag_levels = "A")&theme(legend.position = "none")
@@ -2886,3 +2888,15 @@ MAT_1983_2023<-MAT_1983_2023%>%
   ungroup()%>%
   mutate(Tave_mean=mean(Tave_avg,na.rm=T))
 
+#permutation test for sensitivity to transect selected####
+g_comp_pasture_perm<-grassh_comm_df
+  
+  
+  # group_by(Unit, FireGrzTrt, RecYear,Species)%>%
+  # #average
+  # summarise(abundance=mean(gcount, na.rm=T))%>%
+  # group_by(Unit, FireGrzTrt, RecYear)%>%
+  # mutate(total_abund=sum(abundance))%>%
+  # group_by(Unit, FireGrzTrt,  RecYear,Species)%>%
+  # mutate(rel_abund=abundance/total_abund)%>%
+  # mutate(rep_id=paste(Unit, FireGrzTrt, sep="_"))
