@@ -2901,9 +2901,25 @@ grassh_index<-grass_comm_pbg%>%
   group_by(Unit,RecYear)%>%
   mutate(t_index=1:length(RecYear))
 
-g_comp_pasture_perm<-grass_comm_pbg
-  
-  
+
+num_bootstrap<-100
+bootstrap_vector<-1:num_bootstrap
+g_comp_pasture_perm<-{}
+for(BOOT in 1:length(bootstrap_vector)){
+  gcomp_rand_key<-grassh_index%>%
+    group_by(Unit,RecYear)%>%
+    filter(RecYear==2013)%>%
+    ungroup()%>%
+    sample_n(4, replace=T)%>%
+    dplyr::select(t_index,Unit)%>%
+    ungroup()
+  gcomp_ready<-grassh_index%>%
+    right_join(gcomp_rand_key, by= c("Unit", "t_index"),
+               multiple="all")%>%
+    mutate(iteration=BOOT)
+  g_comp_pasture_perm<-rbind(g_comp_pasture_perm, gcomp_ready)
+}
+
   # group_by(Unit, FireGrzTrt, RecYear,Species)%>%
   # #average
   # summarise(abundance=mean(gcount, na.rm=T))%>%
