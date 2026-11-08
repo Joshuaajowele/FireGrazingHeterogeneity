@@ -2889,7 +2889,19 @@ MAT_1983_2023<-MAT_1983_2023%>%
   mutate(Tave_mean=mean(Tave_avg,na.rm=T))
 
 #permutation test for sensitivity to transect selected####
-g_comp_pasture_perm<-grassh_comm_df
+#extract PBG 
+grass_comm_pbg<-grassh_comm_df%>%
+  filter(FireGrzTrt=="PBG")
+grass_comm_pbg$RecYear=as.factor(grass_comm_pbg$RecYear)
+#create an index
+grassh_index<-grass_comm_pbg%>%
+  mutate(wt=paste(Watershed, Repsite, sep="_"))%>%
+  select(-Species, -gcount)%>%
+  distinct()%>%
+  group_by(Unit,RecYear)%>%
+  mutate(t_index=1:length(RecYear))
+
+g_comp_pasture_perm<-grass_comm_pbg
   
   
   # group_by(Unit, FireGrzTrt, RecYear,Species)%>%
