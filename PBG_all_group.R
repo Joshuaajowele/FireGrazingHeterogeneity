@@ -2902,7 +2902,7 @@ grassh_index<-grass_comm_pbg%>%
   mutate(t_index=1:length(RecYear))
 
 
-num_bootstrap<-100
+num_bootstrap<-20736
 bootstrap_vector<-1:num_bootstrap
 g_comp_pasture_perm<-{}
 for(BOOT in 1:length(bootstrap_vector)){
@@ -2919,7 +2919,7 @@ for(BOOT in 1:length(bootstrap_vector)){
     mutate(iteration=BOOT)
   g_comp_pasture_perm<-rbind(g_comp_pasture_perm, gcomp_ready)
 }
-
+write.csv(g_comp_pasture_perm,"g_comp_pasture_perm.csv")
   # group_by(Unit, FireGrzTrt, RecYear,Species)%>%
   # #average
   # summarise(abundance=mean(gcount, na.rm=T))%>%
