@@ -2,7 +2,7 @@
 #email: joshuaajowele@gmail.com
 #This script is for data wrangling, analyses and visualization for the manuscript
 #Ecological effects of patch-burn grazing vary across trophic groups in tallgrass prairie
-#Date: Feb 6, 2026 Last modified: Nov. 5, 2026
+#Date: Feb 6, 2026 Last modified: Nov. 10, 2026
 
 #Load library####
 library(tidyverse)
@@ -2919,12 +2919,36 @@ for(BOOT in 1:length(bootstrap_vector)){
     mutate(iteration=BOOT)
   g_comp_pasture_perm<-rbind(g_comp_pasture_perm, gcomp_ready)
 }
-write.csv(g_comp_pasture_perm,"g_comp_pasture_perm.csv")
-  # group_by(Unit, FireGrzTrt, RecYear,Species)%>%
-  # #average
-  # summarise(abundance=mean(gcount, na.rm=T))%>%
-  # group_by(Unit, FireGrzTrt, RecYear)%>%
-  # mutate(total_abund=sum(abundance))%>%
-  # group_by(Unit, FireGrzTrt,  RecYear,Species)%>%
-  # mutate(rel_abund=abundance/total_abund)%>%
-  # mutate(rep_id=paste(Unit, FireGrzTrt, sep="_"))
+# write.csv(g_comp_pasture_perm,"g_comp_pasture_perm.csv")
+# g_comp_pasture_perm<-read_csv("g_comp_pasture_perm.csv")%>%
+#   select(-1)
+#checking issues-When the same repsite in watershed is selected 
+#twice of more in each iteration, it was dropped
+#doesn't affect my approach, since I am not interested in repeated repsite.
+g_comp_pasture_perm_check<-g_comp_pasture_perm%>%
+  filter(RecYear=="2013" & Unit=="north" & iteration==1)
+
+g_permute<-g_comp_pasture_perm%>%
+  mutate(id=case_when(Watershed=="C03A"~1,
+                      Watershed=="C03B"~10,
+                      Watershed=="C03C"~20,
+                      Watershed=="C3SA"~1,
+                      Watershed=="C3SB"~10,
+                      Watershed=="C3SC"~20))%>%
+  ungroup()%>%
+  group_by(Unit,RecYear,iteration)%>%
+  mutate(id_filt=sum(id))
+
+g_perm_ready<-g_permute%>%
+  filter(id_filt%in%c(32,41,51))%>%
+  right_join(grassh_comm_df, by=c("Unit","RecYear","FireGrzTrt","Watershed","Repsite"))
+  
+g_perm_ready_sp<-g_perm_ready%>%
+  group_by(Unit, FireGrzTrt, RecYear,Species,iteration)%>%
+  #average
+  summarise(abundance=mean(gcount, na.rm=T))%>%
+  group_by(Unit, FireGrzTrt, RecYear, iteration)%>%
+  mutate(total_abund=sum(abundance))%>%
+  group_by(Unit, FireGrzTrt,  RecYear,Species, iteration)%>%
+  mutate(rel_abund=abundance/total_abund)%>%
+  mutate(rep_id=paste(Unit, FireGrzTrt,iteration, sep="_"))
