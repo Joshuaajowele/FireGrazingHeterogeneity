@@ -2952,3 +2952,49 @@ g_perm_ready_sp<-g_perm_ready%>%
   group_by(Unit, FireGrzTrt,  RecYear,Species, iteration)%>%
   mutate(rel_abund=abundance/total_abund)%>%
   mutate(rep_id=paste(Unit, FireGrzTrt,iteration, sep="_"))
+
+g_rich_perm <- community_structure(g_perm_ready_sp, time.var = "RecYear", 
+                                   abundance.var = "rel_abund",
+                                   replicate.var = "rep_id", metric = "Evar")
+g_rich_perm_all<-g_perm_ready_sp%>%
+  ungroup()%>%
+  select(RecYear, Unit, FireGrzTrt, rep_id)%>%
+  distinct()%>%
+  left_join(g_rich_perm, by=c("RecYear","rep_id"))%>%
+  group_by(Unit, FireGrzTrt, rep_id)%>%
+  summarise(rich=mean(richness,na.rm=T),
+            evar=mean(Evar, na.rm=T))%>%
+  mutate(ABG_rich=case_when(Unit=="north"~21,
+                            Unit=="south"~18.72727),
+         ABG_evar=case_when(Unit=="north"~0.6703358,
+                            Unit=="south"~0.6151681),
+         ABG_PBG_rich=ABG_rich-rich,
+         ABG_PBG_evar=ABG_evar-evar,
+         rich_comp=case_when(Unit=="north"~2.636364,
+                             Unit=="south"~1.363636),
+         evar_comp=case_when(Unit=="north"~-0.1367107,
+                             Unit=="south"~-0.1767019))
+
+#filter for each unit and PBG
+grich_perm_n<-g_rich_perm_all%>%
+  filter(FireGrzTrt=="PBG" & Unit=="north")%>%
+  ggplot(aes(ABG_PBG_rich))+
+  geom_histogram()+
+  geom_vline(xintercept=2.636364)
+grich_perm_s<-g_rich_perm_all%>%
+  filter(FireGrzTrt=="PBG" & Unit=="south")%>%
+  ggplot(aes(ABG_PBG_rich))+
+  geom_histogram()+
+  geom_vline(xintercept=1.363636)
+#plot histogram
+ggplot(grich_perm_n)
+?geom_vline
+  
+##extract diff between PBG and ABG richness####
+g_rich_avg<-g_rich_past%>%
+  group_by(Unit, FireGrzTrt)%>%
+  summarise(rich=mean(richness,na.rm=T),
+            evar=mean(Evar, na.rm=T))%>%
+  pivot_wider(names_from =FireGrzTrt, values_from =c(rich,evar))%>%
+  mutate(rich_diff_ABG_PBG=rich_ABG-rich_PBG,
+         evar_diff_ABG_PBG=evar_ABG-evar_PBG)
