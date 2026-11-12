@@ -2976,7 +2976,27 @@ MAT_1983_2023<-MAT_1983_2023%>%
   mutate(Tave_mean=mean(Tave_avg,na.rm=T))
 
 #permutation test for sensitivity to transect selected####
-#extract PBG 
+##extract diff between PBG and ABG grasshopper richness...####
+g_rich_avg<-g_rich_past%>%
+  group_by(Unit, FireGrzTrt)%>%
+  summarise(rich=mean(richness,na.rm=T),
+            evar=mean(Evar, na.rm=T))%>%
+  pivot_wider(names_from =FireGrzTrt, values_from =c(rich,evar))%>%
+  mutate(rich_diff_ABG_PBG=rich_ABG-rich_PBG,
+         evar_diff_ABG_PBG=evar_ABG-evar_PBG)
+##extract diff between PBG and ABG richness for plant####
+p_rich_avg<-rich_past%>%
+  group_by(Unit, FireGrzTrt)%>%
+  summarise(rich=mean(richness,na.rm=T),
+            evar=mean(Evar, na.rm=T))%>%
+  pivot_wider(names_from =FireGrzTrt, values_from =c(rich,evar))%>%
+  mutate(rich_diff_ABG_PBG=rich_ABG-rich_PBG,
+         evar_diff_ABG_PBG=evar_ABG-evar_PBG)
+p_rich_avg_n<-p_rich_avg%>%
+  filter(Unit=="north")
+p_rich_avg_s<-p_rich_avg%>%
+  filter(Unit=="south")
+#start by extracting PBG 
 grass_comm_pbg<-grassh_comm_df%>%
   filter(FireGrzTrt=="PBG")
 grass_comm_pbg$RecYear=as.factor(grass_comm_pbg$RecYear)
@@ -3060,28 +3080,116 @@ g_rich_perm_all<-g_perm_ready_sp%>%
          rich_comp=case_when(Unit=="north"~2.636364,
                              Unit=="south"~1.363636),
          evar_comp=case_when(Unit=="north"~-0.1367107,
-                             Unit=="south"~-0.1767019))
+                             Unit=="south"~-0.1767019))%>%
+  filter(FireGrzTrt=="PBG")
 
-#filter for each unit and PBG
-grich_perm_n<-g_rich_perm_all%>%
-  filter(FireGrzTrt=="PBG" & Unit=="north")%>%
+#histogram
+grich_perm_ns<-g_rich_perm_all%>%
   ggplot(aes(ABG_PBG_rich))+
   geom_histogram()+
-  geom_vline(xintercept=2.636364)
-grich_perm_s<-g_rich_perm_all%>%
-  filter(FireGrzTrt=="PBG" & Unit=="south")%>%
-  ggplot(aes(ABG_PBG_rich))+
+  geom_vline(xintercept=g_rich_perm_all$rich_comp, linetype="longdash")+
+  xlab(label="Differences between ABG and PBG ghopper richness")+
+  facet_wrap(~g_rich_perm_all$Unit, scale="free")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank())
+
+gevar_perm_ns<-g_rich_perm_all%>%
+  ggplot(aes(ABG_PBG_evar))+
   geom_histogram()+
-  geom_vline(xintercept=1.363636)
-#plot histogram
-ggplot(grich_perm_n)
-?geom_vline
+  geom_vline(xintercept=g_rich_perm_all$evar_comp, linetype="longdash")+
+  facet_wrap(~g_rich_perm_all$Unit, scale="free")+
+  xlab(label="Differences between ABG and PBG ghopper evenness")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank())
   
-##extract diff between PBG and ABG richness####
-g_rich_avg<-g_rich_past%>%
-  group_by(Unit, FireGrzTrt)%>%
+#counting the number of iterations
+g_perm_n<-g_rich_perm_all%>%
+  count(FireGrzTrt)
+
+#plant permutation
+p_perm_ready<-g_permute%>%
+  filter(id_filt%in%c(32,41,51))%>%
+  rename(Transect=Repsite)%>%
+  right_join(pl_species_comp, by=c("Unit","RecYear","FireGrzTrt","Watershed","Transect"))
+p_perm_sp<-p_perm_ready%>%
+  group_by(Unit, FireGrzTrt, RecYear,sp,iteration)%>%
+  #average
+  summarise(abundance=mean(abundance, na.rm=T))%>%
+  group_by(Unit, FireGrzTrt, RecYear, iteration)%>%
+  mutate(total_abund=sum(abundance))%>%
+  group_by(Unit, FireGrzTrt,  RecYear,sp, iteration)%>%
+  mutate(rel_abund=abundance/total_abund)%>%
+  mutate(rep_id=paste(Unit, FireGrzTrt,iteration, sep="_"))
+
+pl_rich_perm <- community_structure(p_perm_sp, time.var = "RecYear", 
+                                   abundance.var = "rel_abund",
+                                   replicate.var = "rep_id", metric = "Evar")
+p_rich_perm_all<-p_perm_sp%>%
+  ungroup()%>%
+  select(RecYear, Unit, FireGrzTrt, rep_id)%>%
+  distinct()%>%
+  left_join(pl_rich_perm, by=c("RecYear","rep_id"))%>%
+  group_by(Unit, FireGrzTrt, rep_id)%>%
   summarise(rich=mean(richness,na.rm=T),
             evar=mean(Evar, na.rm=T))%>%
-  pivot_wider(names_from =FireGrzTrt, values_from =c(rich,evar))%>%
-  mutate(rich_diff_ABG_PBG=rich_ABG-rich_PBG,
-         evar_diff_ABG_PBG=evar_ABG-evar_PBG)
+  mutate(ABG_rich=case_when(Unit=="north"~p_rich_avg_n$rich_ABG,
+                            Unit=="south"~p_rich_avg_s$rich_ABG),
+         ABG_evar=case_when(Unit=="north"~p_rich_avg_n$evar_ABG,
+                            Unit=="south"~p_rich_avg_s$evar_ABG),
+         ABG_PBG_rich=ABG_rich-rich,
+         ABG_PBG_evar=ABG_evar-evar,
+         rich_comp=case_when(Unit=="north"~p_rich_avg_n$rich_diff_ABG_PBG,
+                             Unit=="south"~p_rich_avg_s$rich_diff_ABG_PBG),
+         evar_comp=case_when(Unit=="north"~p_rich_avg_n$evar_diff_ABG_PBG,
+                             Unit=="south"~p_rich_avg_s$evar_diff_ABG_PBG))%>%
+  filter(FireGrzTrt=="PBG")
+#histogram
+prich_perm_ns<-p_rich_perm_all%>%
+  ggplot(aes(ABG_PBG_rich))+
+  geom_histogram()+
+  geom_vline(xintercept=p_rich_perm_all$rich_comp, linetype="longdash")+
+  xlab(label="Differences between ABG and PBG plant richness")+
+  facet_wrap(~p_rich_perm_all$Unit, scale="free")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank())
+
+pevar_perm_ns<-p_rich_perm_all%>%
+  ggplot(aes(ABG_PBG_evar))+
+  geom_histogram()+
+  geom_vline(xintercept=p_rich_perm_all$evar_comp, linetype="longdash")+
+  facet_wrap(~p_rich_perm_all$Unit)+
+  xlab(label="Differences between ABG and PBG plant evenness")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank())
+
+#combine figures
+prich_perm_ns/pevar_perm_ns-grich_perm_ns/gevar_perm_ns
+
+#permutation test
+g_perm_test<-g_rich_perm_all%>%
+  mutate(rich_diff=ABG_PBG_rich-rich_comp,
+         evar_diff=ABG_PBG_evar-evar_comp)%>%
+  group_by(Unit)%>%
+  mutate(prop=rich_diff>0,
+         prop_evar=evar_diff>0)%>%
+  group_by(prop,Unit)%>%
+  mutate(n_prop=n(),
+        )%>%
+  group_by(prop_evar, Unit)%>%
+  mutate(n_p_evar=n())
+#calculate propotion greater than observed
+# g richness north
+(931/1170)
+#south
+805/1103
+#evar
+#south
+1059/1103
+#north
+1168/1170
+
+
