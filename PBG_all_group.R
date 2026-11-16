@@ -3169,27 +3169,29 @@ pevar_perm_ns<-p_rich_perm_all%>%
 #combine figures
 prich_perm_ns/pevar_perm_ns-grich_perm_ns/gevar_perm_ns
 
-#permutation test
+##Calculate Z-score and p-value####
 g_perm_test<-g_rich_perm_all%>%
-  mutate(rich_diff=ABG_PBG_rich-rich_comp,
-         evar_diff=ABG_PBG_evar-evar_comp)%>%
   group_by(Unit)%>%
-  mutate(prop=rich_diff>0,
-         prop_evar=evar_diff>0)%>%
-  group_by(prop,Unit)%>%
-  mutate(n_prop=n(),
-        )%>%
-  group_by(prop_evar, Unit)%>%
-  mutate(n_p_evar=n())
-#calculate propotion greater than observed
-# g richness north
-(931/1170)
-#south
-805/1103
-#evar
-#south
-1059/1103
-#north
-1168/1170
+  mutate(rich_diff_avg=mean(ABG_PBG_rich,na.rm=T),
+         rich_sd=sd(ABG_PBG_rich),
+         evar_diff_avg=mean(ABG_PBG_evar, na.rm=T),
+         evar_sd=sd(ABG_PBG_evar))%>%
+  mutate(rich_zscore=(rich_comp-rich_diff_avg)/rich_sd,
+         evar_zscore=(evar_comp-evar_diff_avg)/evar_sd)%>%
+  mutate(rich_pvalue=2*pnorm(-abs(rich_zscore)),
+         evar_pvalue=2*pnorm(-abs(evar_zscore)))
+
+p_perm_test<-p_rich_perm_all%>%
+  group_by(Unit)%>%
+  mutate(rich_diff_avg=mean(ABG_PBG_rich,na.rm=T),
+         rich_sd=sd(ABG_PBG_rich),
+         evar_diff_avg=mean(ABG_PBG_evar, na.rm=T),
+         evar_sd=sd(ABG_PBG_evar))%>%
+  mutate(rich_zscore=(rich_comp-rich_diff_avg)/rich_sd,
+         evar_zscore=(evar_comp-evar_diff_avg)/evar_sd)%>%
+  mutate(rich_pvalue=2*pnorm(-abs(rich_zscore)),
+         evar_pvalue=2*pnorm(-abs(evar_zscore)))
+  
+
 
 
