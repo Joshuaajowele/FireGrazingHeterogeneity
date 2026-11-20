@@ -2,7 +2,7 @@
 #email: joshuaajowele@gmail.com
 #This script is for data wrangling, analyses and visualization for the manuscript
 #Ecological effects of patch-burn grazing vary across trophic groups in tallgrass prairie
-#Date: Feb 6, 2026 Last modified: Nov. 11, 2026
+#Date: Feb 6, 2026 Last modified: Nov. 20, 2026
 
 #Load library####
 library(tidyverse)
@@ -2976,26 +2976,25 @@ MAT_1983_2023<-MAT_1983_2023%>%
   mutate(Tave_mean=mean(Tave_avg,na.rm=T))
 
 #permutation test for sensitivity to transect selected####
-##extract diff between PBG and ABG grasshopper richness...####
+##estimate richness and evenness for all PBG combination...####
 g_rich_avg<-g_rich_past%>%
   group_by(Unit, FireGrzTrt)%>%
   summarise(rich=mean(richness,na.rm=T),
-            evar=mean(Evar, na.rm=T))%>%
-  pivot_wider(names_from =FireGrzTrt, values_from =c(rich,evar))%>%
-  mutate(rich_diff_ABG_PBG=rich_ABG-rich_PBG,
-         evar_diff_ABG_PBG=evar_ABG-evar_PBG)
-##extract diff between PBG and ABG richness for plant####
+            evar=mean(Evar, na.rm=T))
+##for plant####
 p_rich_avg<-rich_past%>%
   group_by(Unit, FireGrzTrt)%>%
   summarise(rich=mean(richness,na.rm=T),
-            evar=mean(Evar, na.rm=T))%>%
-  pivot_wider(names_from =FireGrzTrt, values_from =c(rich,evar))%>%
-  mutate(rich_diff_ABG_PBG=rich_ABG-rich_PBG,
-         evar_diff_ABG_PBG=evar_ABG-evar_PBG)
-p_rich_avg_n<-p_rich_avg%>%
-  filter(Unit=="north")
-p_rich_avg_s<-p_rich_avg%>%
-  filter(Unit=="south")
+            evar=mean(Evar, na.rm=T))
+g_rich_avg_PBG<-g_rich_avg%>%
+  ungroup()%>%
+  filter(FireGrzTrt=="PBG")
+
+p_rich_avg_PBG<-p_rich_avg%>%
+  ungroup()%>%
+  filter(FireGrzTrt=="PBG")
+
+
 #start by extracting PBG 
 grass_comm_pbg<-grassh_comm_df%>%
   filter(FireGrzTrt=="PBG")
@@ -3069,37 +3068,28 @@ g_rich_perm_all<-g_perm_ready_sp%>%
   distinct()%>%
   left_join(g_rich_perm, by=c("RecYear","rep_id"))%>%
   group_by(Unit, FireGrzTrt, rep_id)%>%
-  summarise(rich=mean(richness,na.rm=T),
-            evar=mean(Evar, na.rm=T))%>%
-  mutate(ABG_rich=case_when(Unit=="north"~21,
-                            Unit=="south"~18.72727),
-         ABG_evar=case_when(Unit=="north"~0.6703358,
-                            Unit=="south"~0.6151681),
-         ABG_PBG_rich=ABG_rich-rich,
-         ABG_PBG_evar=ABG_evar-evar,
-         rich_comp=case_when(Unit=="north"~2.636364,
-                             Unit=="south"~1.363636),
-         evar_comp=case_when(Unit=="north"~-0.1367107,
-                             Unit=="south"~-0.1767019))%>%
-  filter(FireGrzTrt=="PBG")
+  summarise(richn=mean(richness,na.rm=T),
+            evarr=mean(Evar, na.rm=T))%>%
+  filter(FireGrzTrt=="PBG")%>%
+  left_join(g_rich_avg_PBG, by=c("Unit", "FireGrzTrt"))
 
 #histogram
 grich_perm_ns<-g_rich_perm_all%>%
-  ggplot(aes(ABG_PBG_rich))+
+  ggplot(aes(richn))+
   geom_histogram()+
-  geom_vline(xintercept=g_rich_perm_all$rich_comp, linetype="longdash")+
-  xlab(label="Differences between ABG and PBG ghopper richness")+
+  geom_vline(xintercept=g_rich_perm_all$rich, linetype="longdash")+
+  xlab(label="PBG grasshopper richness")+
   facet_wrap(~g_rich_perm_all$Unit, scale="free")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank())
 
 gevar_perm_ns<-g_rich_perm_all%>%
-  ggplot(aes(ABG_PBG_evar))+
+  ggplot(aes(evarr))+
   geom_histogram()+
-  geom_vline(xintercept=g_rich_perm_all$evar_comp, linetype="longdash")+
+  geom_vline(xintercept=g_rich_perm_all$evar, linetype="longdash")+
   facet_wrap(~g_rich_perm_all$Unit, scale="free")+
-  xlab(label="Differences between ABG and PBG ghopper evenness")+
+  xlab(label="PBG grasshopper evenness")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank())
@@ -3132,36 +3122,27 @@ p_rich_perm_all<-p_perm_sp%>%
   distinct()%>%
   left_join(pl_rich_perm, by=c("RecYear","rep_id"))%>%
   group_by(Unit, FireGrzTrt, rep_id)%>%
-  summarise(rich=mean(richness,na.rm=T),
-            evar=mean(Evar, na.rm=T))%>%
-  mutate(ABG_rich=case_when(Unit=="north"~p_rich_avg_n$rich_ABG,
-                            Unit=="south"~p_rich_avg_s$rich_ABG),
-         ABG_evar=case_when(Unit=="north"~p_rich_avg_n$evar_ABG,
-                            Unit=="south"~p_rich_avg_s$evar_ABG),
-         ABG_PBG_rich=ABG_rich-rich,
-         ABG_PBG_evar=ABG_evar-evar,
-         rich_comp=case_when(Unit=="north"~p_rich_avg_n$rich_diff_ABG_PBG,
-                             Unit=="south"~p_rich_avg_s$rich_diff_ABG_PBG),
-         evar_comp=case_when(Unit=="north"~p_rich_avg_n$evar_diff_ABG_PBG,
-                             Unit=="south"~p_rich_avg_s$evar_diff_ABG_PBG))%>%
-  filter(FireGrzTrt=="PBG")
+  summarise(richn=mean(richness,na.rm=T),
+            evarr=mean(Evar, na.rm=T))%>%
+  filter(FireGrzTrt=="PBG")%>%
+  left_join(p_rich_avg_PBG, by=c("Unit", "FireGrzTrt"))
 #histogram
 prich_perm_ns<-p_rich_perm_all%>%
-  ggplot(aes(ABG_PBG_rich))+
+  ggplot(aes(richn))+
   geom_histogram()+
-  geom_vline(xintercept=p_rich_perm_all$rich_comp, linetype="longdash")+
-  xlab(label="Differences between ABG and PBG plant richness")+
+  geom_vline(xintercept=p_rich_perm_all$rich, linetype="longdash")+
+  xlab(label="PBG plant richness")+
   facet_wrap(~p_rich_perm_all$Unit, scale="free")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank())
 
 pevar_perm_ns<-p_rich_perm_all%>%
-  ggplot(aes(ABG_PBG_evar))+
+  ggplot(aes(evarr))+
   geom_histogram()+
-  geom_vline(xintercept=p_rich_perm_all$evar_comp, linetype="longdash")+
-  facet_wrap(~p_rich_perm_all$Unit)+
-  xlab(label="Differences between ABG and PBG plant evenness")+
+  geom_vline(xintercept=p_rich_perm_all$evar, linetype="longdash")+
+  facet_wrap(~p_rich_perm_all$Unit, scale="free")+
+  xlab(label="PBG plant evenness")+
   theme_bw()+
   theme(panel.grid.major = element_blank(),  # Remove major gridlines
         panel.grid.minor = element_blank())
