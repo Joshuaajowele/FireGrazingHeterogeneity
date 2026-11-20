@@ -403,6 +403,16 @@ spat_biomcv_m<-lmer(log(spat_biom_cv)~FireGrzTrt*Recyear+(1|Unit), data=spat_bio
 check_model(spat_biomcv_m)
 anova(spat_biomcv_m)
 
+#testing with nlme for repeated measures
+# library(nlme)
+#  lll<-lme(log(spat_biom)~FireGrzTrt*Recyear,
+#           data=spat_biomdata[spat_biomdata$spat_biom<1000,],
+#          random=~1|Unit,
+#           correlation=corCompSymm(form = ~1|Unit)
+#           , control=lmeControl(returnObject=TRUE)
+#           , na.action = na.omit)
+#  anova(lll)
+
 
 ##visuals####
 biom_mean<-interactionMeans(spat_biommean_m)%>%
@@ -717,6 +727,15 @@ rich_past$Unit=as.factor(rich_past$Unit)
 rich_past_m<-lmer(richness~FireGrzTrt*RecYear+(1|Unit), data=rich_past)
 check_model(rich_past_m)
 anova(rich_past_m)
+#testing with nlme for repeated measures
+# lll<-lme(richness~FireGrzTrt*RecYear,
+#          data=rich_past,
+#          random=~1|Unit,
+#          correlation=corCompSymm(form = ~1|Unit)
+#          , control=lmeControl(returnObject=TRUE)
+#          , na.action = na.omit)
+# anova(lll)
+
 even_past_m<-lmer(Evar~FireGrzTrt*RecYear+(1|Unit), data=rich_past)
 check_model(even_past_m)
 anova(even_past_m)
@@ -2376,6 +2395,14 @@ anova(b_rich_trsct_m)
 b_even_trsct_m<-lmer(Evar~FireGrzTrt*Year+(1|Watershed), data=b_rich_trsct)
 check_model(b_even_trsct_m)
 anova(b_even_trsct_m)
+#checking with nlme for repeated measures
+# lll<-lme(Evar~FireGrzTrt*Year,
+#          data=b_rich_trsct,
+#          random=~1|Watershed,
+#          correlation=corCompSymm(form = ~1|Watershed)
+#          , control=lmeControl(returnObject=TRUE)
+#          , na.action = na.omit)
+# anova(lll)
 
 
 #####visuals#####
@@ -3153,23 +3180,23 @@ prich_perm_ns/pevar_perm_ns-grich_perm_ns/gevar_perm_ns
 ##Calculate Z-score and p-value####
 g_perm_test<-g_rich_perm_all%>%
   group_by(Unit)%>%
-  mutate(rich_diff_avg=mean(ABG_PBG_rich,na.rm=T),
-         rich_sd=sd(ABG_PBG_rich),
-         evar_diff_avg=mean(ABG_PBG_evar, na.rm=T),
-         evar_sd=sd(ABG_PBG_evar))%>%
-  mutate(rich_zscore=(rich_comp-rich_diff_avg)/rich_sd,
-         evar_zscore=(evar_comp-evar_diff_avg)/evar_sd)%>%
+  mutate(rich_avg=mean(richn,na.rm=T),
+         rich_sd=sd(richn),
+         evar_avg=mean(evarr, na.rm=T),
+         evar_sd=sd(evarr))%>%
+  mutate(rich_zscore=(rich-rich_avg)/rich_sd,
+         evar_zscore=(evar-evar_avg)/evar_sd)%>%
   mutate(rich_pvalue=2*pnorm(-abs(rich_zscore)),
          evar_pvalue=2*pnorm(-abs(evar_zscore)))
 
 p_perm_test<-p_rich_perm_all%>%
   group_by(Unit)%>%
-  mutate(rich_diff_avg=mean(ABG_PBG_rich,na.rm=T),
-         rich_sd=sd(ABG_PBG_rich),
-         evar_diff_avg=mean(ABG_PBG_evar, na.rm=T),
-         evar_sd=sd(ABG_PBG_evar))%>%
-  mutate(rich_zscore=(rich_comp-rich_diff_avg)/rich_sd,
-         evar_zscore=(evar_comp-evar_diff_avg)/evar_sd)%>%
+  mutate(rich_avg=mean(richn,na.rm=T),
+         rich_sd=sd(richn),
+         evar_avg=mean(evarr, na.rm=T),
+         evar_sd=sd(evarr))%>%
+  mutate(rich_zscore=(rich-rich_avg)/rich_sd,
+         evar_zscore=(evar-evar_avg)/evar_sd)%>%
   mutate(rich_pvalue=2*pnorm(-abs(rich_zscore)),
          evar_pvalue=2*pnorm(-abs(evar_zscore)))
   
